@@ -1,0 +1,107 @@
+[project]
+name = "inz"
+version = "0.1.0"
+description = "Default template for PDM package"
+authors = [
+    {name = "towienko", email = "t.owienko@gmail.com"},
+]
+dependencies = [
+    "pytest>=8.1.1",
+    "torch>=2.2.2",
+    "torchvision>=0.17.2",
+    "torchaudio>=2.2.2",
+]
+requires-python = "==3.11.*"
+readme = "README.md"
+license = {text = "MIT"}
+
+
+[tool.pdm]
+distribution = false
+
+# [tool.pdm.conda]
+# runner = "conda"
+# channels = ["conda-forge", "pytorch", "nvidia"]
+# solver = "conda"
+# installation-method = "copy"
+# batched-commands = true
+# dependencies = []
+# excludes = ["python3", "pdm-conda"]
+
+[tool.pdm.dev-dependencies]
+dev = [
+    "mypy>=1.9.0",
+    "ruff>=0.4.1",
+]
+
+[tool.mypy]
+disallow_untyped_defs = "True"
+disallow_any_unimported = "True"
+no_implicit_optional = "True"
+check_untyped_defs = "True"
+warn_return_any = "True"
+warn_unused_ignores = "True"
+show_error_codes = "True"
+
+
+[tool.ruff]
+# Exclude a variety of commonly ignored directories.
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".ipynb_checkpoints",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pyenv",
+    ".pytest_cache",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    ".vscode",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "site-packages",
+    "venv",
+]
+target-version = "py311"
+indent-width = 4
+line-length = 120
+
+[tool.ruff.lint]
+# By default, Ruff enables Flake8's E and F rules
+# Pyflakes - F, pycodestyle - E, W
+# flake8-builtins - A
+# Pylint - PLC, PLE, PLW
+# isort - I
+select = ['E', 'F', 'W', 'A', 'PLC', 'PLE', 'PLW', 'I']
+ignore = [
+    # LineTooLong
+    "E501",
+    # DoNotAssignLambda
+    "E731",
+]
+# Allow fix for all enabled rules (when `--fix`) is provided.
+fixable = ["ALL"]
+unfixable = []
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+
+[tool.ruff.format]
+# Like Black, indent with spaces, rather than tabs.
+indent-style = "space"
+
+# Like Black, respect magic trailing commas.
+skip-magic-trailing-comma = false
+
+# Like Black, automatically detect the appropriate line ending.
+line-ending = "auto"
