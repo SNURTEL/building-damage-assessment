@@ -21,7 +21,7 @@ class BuildingDamage(str, Enum):
 
 
 def plot_ploygons(
-    img_path: Path | str, damage_to_rgba: dict[BuildingDamage, tuple[int, int, int, int]] | None = None
+    img_path: Path | str, damage_to_rgba: dict[BuildingDamage, tuple[int, int, int, int]] | None = None,
 ) -> Image:
     """
     Plot damage polygons over GeoTIFF image from given file.
