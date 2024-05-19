@@ -3,5 +3,8 @@
     "files.autoSave": "onFocusChange",
     "mypy.dmypyExecutable": "${workspaceFolder}/.venv/bin/dmypy",
     "ruff.lint.args": ["--config=${workspaceFolder}/pyproject.toml"],
-    "ruff.format.args": ["--config=${workspaceFolder}/pyproject.toml"] 
+    "ruff.format.args": ["--config=${workspaceFolder}/pyproject.toml"] ,
+    "autoDocstring.docstringFormat": "google-notypes",
+    "editor.rulers": [120]
+
 }
