@@ -9,14 +9,14 @@ from enum import Enum
 from pathlib import Path
 from typing import Collection, Literal
 
-import geotiff
+import geotiff  # type: ignore[import-untyped]
 import numpy as np
-import rasterio.features
-import shapely.geometry
-import shapely.wkt
-from patchify import patchify
+import rasterio.features  # type: ignore[import-untyped]
+import shapely.geometry  # type: ignore[import-untyped]
+import shapely.wkt  # type: ignore[import-untyped]
+from patchify import patchify  # type: ignore[import-untyped]
 from PIL import Image, ImageDraw
-from tqdm import tqdm
+from tqdm import tqdm  # type: ignore[import-untyped]
 
 
 class BuildingDamage(str, Enum):
@@ -42,7 +42,7 @@ def load_geotiff(
     img_path = Path(img_path)
     geotiff_img = geotiff.GeoTiff(img_path)
     array_img = np.array(geotiff_img.read(), dtype=np.uint8)
-    return Image.fromarray(array_img)
+    return Image.fromarray(array_img)  # type: ignore[no-any-return]
 
 
 def plot_ploygons(
@@ -138,7 +138,7 @@ def make_mask(labels_path: Path | str, img_size: tuple[int, int]) -> np.ndarray:
     }
 
     rasterized_layers = [rasterized.get(i, np.zeros(img_size, dtype=np.uint8)) for i in range(5)]
-    return np.stack(rasterized_layers).transpose((1, 2, 0))
+    return np.stack(rasterized_layers).transpose((1, 2, 0))  # type: ignore[no-any-return]
 
 
 def img_path_to_labels_path(img_path: Path) -> Path:

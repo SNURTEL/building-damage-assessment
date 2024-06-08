@@ -1,114 +1,18 @@
-from collections import Counter
-from enum import Enum
 import itertools
-from pathlib import Path
 import os
+from collections import Counter
+from pathlib import Path
 from typing import Literal, Sequence
 
-import pytorch_lightning as pl
-from pytorch_lightning.utilities.types import TRAIN_DATALOADERS
-from torch.utils.data import DataLoader, Dataset, random_split
-from torchvision.io import read_image
 import numpy as np
+import pytorch_lightning as pl
 import torch
+from pytorch_lightning.utilities.types import TRAIN_DATALOADERS
+from torchvision import transforms
+from torch.utils.data import DataLoader, Dataset, random_split
+from torchvision.io import read_image  # type: ignore[import-untyped]
 
-
-class Event(Enum):
-    guatemala_volcano = "guatemala-volcano"
-    hurricane_florence = "hurricane-florence"
-    hurricane_harvey = "hurricane-harvey"
-    hurricane_matthew = "hurricane-matthew"
-    hurricane_michael = "hurricane-michael"
-    joplin_tornado = "joplin-tornado"
-    lower_puna_volcano = "lower-puna-volcano"
-    mexico_earthquake = "mexico-earthquake"
-    midwest_flooding = "midwest-flooding"
-    moore_tornado = "moore-tornado"
-    nepal_flooding = "nepal-flooding"
-    palu_tsunami = "palu-tsunami"
-    pinery_bushfire = "pinery-bushfire"
-    portugal_wildfire = "portugal-wildfire"
-    santa_rosa_wildfire = "santa-rosa-wildfire"
-    socal_fire = "socal-fire"
-    sunda_tsunami = "sunda-tsunami"
-    tuscaloosa_tornado = "tuscaloosa-tornado"
-    woolsey_fire = "woolsey-fire"
-
-
-class _SubsetBase:
-    """Base class for dataset subset (challenge split)"""
-
-    events: set[Event]
-
-
-class Test(_SubsetBase):
-    """Events from "Test" challenge split"""
-
-    events = {
-        Event.guatemala_volcano,
-        Event.hurricane_florence,
-        Event.hurricane_harvey,
-        Event.hurricane_matthew,
-        Event.hurricane_michael,
-        Event.mexico_earthquake,
-        Event.midwest_flooding,
-        Event.palu_tsunami,
-        Event.santa_rosa_wildfire,
-        Event.socal_fire,
-    }
-
-
-class Hold(_SubsetBase):
-    """Events from "Hold" challenge split"""
-
-    events = {
-        Event.guatemala_volcano,
-        Event.hurricane_florence,
-        Event.hurricane_harvey,
-        Event.hurricane_matthew,
-        Event.hurricane_michael,
-        Event.mexico_earthquake,
-        Event.midwest_flooding,
-        Event.palu_tsunami,
-        Event.santa_rosa_wildfire,
-        Event.socal_fire,
-    }
-
-
-class Tier1(_SubsetBase):
-    """Events from "Tier 1" challenge split"""
-
-    events = {
-        Event.guatemala_volcano,
-        Event.hurricane_florence,
-        Event.hurricane_harvey,
-        Event.hurricane_matthew,
-        Event.hurricane_michael,
-        Event.mexico_earthquake,
-        Event.midwest_flooding,
-        Event.palu_tsunami,
-        Event.santa_rosa_wildfire,
-        Event.socal_fire,
-    }
-
-
-class Tier3(_SubsetBase):
-    """Events from "Tier 3" challenge split"""
-
-    events = {
-        Event.joplin_tornado,
-        Event.lower_puna_volcano,
-        Event.moore_tornado,
-        Event.nepal_flooding,
-        Event.pinery_bushfire,
-        Event.portugal_wildfire,
-        Event.sunda_tsunami,
-        Event.tuscaloosa_tornado,
-        Event.woolsey_fire,
-    }
-
-
-Subset = type[Test | Hold | Tier1 | Tier3]
+from inz.data.event import Event, Hold, Subset, Test, Tier1, Tier3
 
 Split = Literal["train", "val", "test"]
 
@@ -123,7 +27,7 @@ class XBDDataset(Dataset):
             image_paths: Paths to image files
             mask_paths: Paths to mask files
         """
-        super().__init__()
+        super(XBDDataset, self).__init__()
         assert len(image_paths) == len(mask_paths), "Image and mask paths must be of the same length"
         key = lambda p: "post_disaster" in p.name
         images_grouped = itertools.groupby(sorted(image_paths, key=key), key=key)
@@ -136,20 +40,19 @@ class XBDDataset(Dataset):
         assert len(self._mask_paths_pre) == len(
             self._mask_paths_post
         ), f"Got a different number of pre ({len(self._mask_paths_pre)}) and post ({len(self._mask_paths_post)}) masks"
-        print([len(p) for p in (self._image_paths_pre, self._mask_paths_pre, self._image_paths_post, self._mask_paths_post)])
+
+        self.image_transform = transforms.Compose([
+            transforms.Normalize(0.5,0.5),
+        ])
 
     def __getitem__(self, index: int) -> tuple[tuple[torch.Tensor, torch.Tensor], tuple[torch.Tensor, torch.Tensor]]:
-        try:
-            image_pre = read_image(str(self._image_paths_pre[index]))
-            mask_pre_arr = np.load(self._mask_paths_pre[index])["arr_0"]
-            mask_pre = torch.tensor(mask_pre_arr)
-            image_post = read_image(str(self._image_paths_post[index]))
-            mask_post_arr = np.load(self._mask_paths_post[index])["arr_0"]
-            mask_post = torch.tensor(mask_post_arr)
-            return (image_pre, mask_pre), (image_post, mask_post)
-        except Exception as e:
-            print(f"Index {index}")
-            raise e
+        image_pre = read_image(str(self._image_paths_pre[index])).to(torch.float) / 255
+        mask_pre_arr = np.load(self._mask_paths_pre[index])["arr_0"]
+        mask_pre = torch.tensor(mask_pre_arr, dtype=torch.float)
+        image_post = read_image(str(self._image_paths_post[index])).to(torch.float) / 255
+        mask_post_arr = np.load(self._mask_paths_post[index])["arr_0"]
+        mask_post = torch.tensor(mask_post_arr, dtype=torch.float)
+        return self.image_transform(image_pre), mask_pre, self.image_transform(image_post), mask_post  # type: ignore[return-value]
 
     def __len__(self) -> int:
         return len(self._image_paths_pre)
@@ -218,6 +121,7 @@ class XBDDataModule(pl.LightningDataModule):
             AssertionError: Argument validation failed
             RuntimeError: Unable to determine split method
         """
+        super(XBDDataModule, self).__init__()
 
         # TODO group pre and post disaster
 
@@ -323,19 +227,22 @@ class XBDDataModule(pl.LightningDataModule):
         if not self._train_batch_size:
             raise RuntimeError(f"Requested train dataloader, but train batch size is {self._train_batch_size}")
         return DataLoader(
-            self._train_dataset, batch_size=self._train_batch_size, num_workers=os.cpu_count() or 8, pin_memory=True, shuffle=True
+            self._train_dataset,
+            batch_size=self._train_batch_size,
+            num_workers=os.cpu_count() or 8,
+            shuffle=True,
         )
 
     def val_dataloader(self) -> TRAIN_DATALOADERS:
         if not self._val_batch_size:
             raise RuntimeError(f"Requested val dataloader, but val batch size is {self._val_batch_size}")
         return DataLoader(
-            self._val_dataset, batch_size=self._val_batch_size, num_workers=os.cpu_count() or 8, pin_memory=True
+            self._val_dataset, batch_size=self._val_batch_size, num_workers=os.cpu_count() or 8
         )
 
     def test_dataloader(self) -> TRAIN_DATALOADERS:
         if not self._test_batch_size:
             raise RuntimeError(f"Requested test dataloader, but test batch size is {self._test_batch_size}")
         return DataLoader(
-            self._test_dataset, batch_size=self._test_batch_size, num_workers=os.cpu_count() or 8, pin_memory=True
+            self._test_dataset, batch_size=self._test_batch_size, num_workers=os.cpu_count() or 8
         )
