@@ -3,9 +3,9 @@
 import argparse
 import itertools
 import json
-import multiprocessing
+import multiprocessing as mp
 import os
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from enum import Enum
 from pathlib import Path
 from typing import Literal, Collection
@@ -79,7 +79,7 @@ def plot_ploygons(
         BuildingDamage.destroyed: (255, 0, 0, 80),
         BuildingDamage.un_classifeid: (255, 255, 255, 80),
     }
-    
+
     img = img.copy()
 
     with open(labels_path, mode="r") as fp:
@@ -162,9 +162,6 @@ if __name__ == "__main__":
     todos_t = Literal["images", "masks", "preview"]
 
     def process_single_image(img_path: Path, todos: Collection[todos_t]) -> None:
-        msg = f"{img_path.relative_to(img_path.parents[2])}"
-        tqdm.write(f"{msg: <88}", end="")
-
         image = load_geotiff(img_path)
 
         mask_path = img_path_to_labels_path(img_path)
@@ -187,7 +184,7 @@ if __name__ == "__main__":
                 else []
             )
             + (
-                [(mask, OUT_MASKS_PATH, lambda path, arr: np.savez_compressed(path.with_suffix(".npz"), arr))]
+                [(mask, OUT_MASKS_PATH, lambda path, arr: np.savez_compressed(path.with_suffix(".npz"), arr.transpose((2, 0, 1))))]
                 if "masks" in todos
                 else []
             )
@@ -217,29 +214,23 @@ if __name__ == "__main__":
             for patch_num, out_path in enumerate(out_paths):
                 save(out_path, patches[patch_num % n_patches_h, patch_num // n_patches_w, 0])
 
-    queue: multiprocessing.Queue = multiprocessing.Queue()
 
-    def wrapper(img_path: Path, todos: Collection[todos_t]) -> None:
+    def wrapper(img_path: Path, todos: Collection[todos_t]) -> Path:
         process_single_image(img_path, todos)
-        queue.put(img_path)
+        return img_path
 
     all_todos = {"images", "masks", "preview"}
     parser = argparse.ArgumentParser()
     parser.add_argument("todos", nargs="+", choices=all_todos | {"all"})
     args = parser.parse_args()
     todos = set(args.todos) if "all" not in args.todos else all_todos
-    print(todos)
 
     with ProcessPoolExecutor() as executor:
         tasks = [executor.submit(wrapper, img_path, todos) for img_path in DATASET_PATH.rglob(rglob)]
 
         try:
-            for _ in tqdm(range(num_images)):
-                path = queue.get()
-                tqdm.write(str(path))
+            for task in tqdm(as_completed(tasks), total=num_images, desc=f"Creating {', '.join(todos)}"):
+                tqdm.write(str(task.result()))
         except KeyboardInterrupt:
             for task in tasks:
                 task.cancel()
-
-    queue.close()
-    queue.join_thread()
