@@ -3,12 +3,12 @@
 import argparse
 import itertools
 import json
-import multiprocessing as mp
 import os
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from enum import Enum
 from pathlib import Path
-from typing import Literal, Collection
+from typing import Collection, Literal
+
 import geotiff
 import numpy as np
 import rasterio.features

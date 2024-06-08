@@ -1,10 +1,16 @@
 from collections import Counter
 from enum import Enum
+import itertools
 from pathlib import Path
+import os
 from typing import Literal, Sequence
 
 import pytorch_lightning as pl
-from torch.utils.data import Dataset, random_split
+from pytorch_lightning.utilities.types import TRAIN_DATALOADERS
+from torch.utils.data import DataLoader, Dataset, random_split
+from torchvision.io import read_image
+import numpy as np
+import torch
 
 
 class Event(Enum):
@@ -107,8 +113,8 @@ Subset = type[Test | Hold | Tier1 | Tier3]
 Split = Literal["train", "val", "test"]
 
 
-class LazySegmentationDataset(Dataset):
-    """Basic dataset for loading images and maska for semantic segmentation from disk"""
+class XBDDataset(Dataset):
+    """Dataset class for the xBD dataset."""
 
     def __init__(self, image_paths: Sequence[Path], mask_paths: Sequence[Path]) -> None:
         """Init the class
@@ -119,14 +125,34 @@ class LazySegmentationDataset(Dataset):
         """
         super().__init__()
         assert len(image_paths) == len(mask_paths), "Image and mask paths must be of the same length"
-        self._image_paths = image_paths
-        self._mask_paths = mask_paths
+        key = lambda p: "post_disaster" in p.name
+        images_grouped = itertools.groupby(sorted(image_paths, key=key), key=key)
+        self._image_paths_pre, self._image_paths_post = [sorted(grouper) for _, grouper in images_grouped]
+        assert (
+            len(self._image_paths_pre) == len(self._image_paths_post)
+        ), f"Got a different number of pre ({len(self._image_paths_pre)}) and post ({len(self._image_paths_post)}) images"
+        masks_grouped = itertools.groupby(sorted(mask_paths, key=key), key=key)
+        self._mask_paths_pre, self._mask_paths_post = [sorted(grouper) for _, grouper in masks_grouped]
+        assert len(self._mask_paths_pre) == len(
+            self._mask_paths_post
+        ), f"Got a different number of pre ({len(self._mask_paths_pre)}) and post ({len(self._mask_paths_post)}) masks"
+        print([len(p) for p in (self._image_paths_pre, self._mask_paths_pre, self._image_paths_post, self._mask_paths_post)])
 
-    def __getitem__(self, index: int) -> tuple[Path, Path]:
-        return self._image_paths[index], self._mask_paths[index]
+    def __getitem__(self, index: int) -> tuple[tuple[torch.Tensor, torch.Tensor], tuple[torch.Tensor, torch.Tensor]]:
+        try:
+            image_pre = read_image(str(self._image_paths_pre[index]))
+            mask_pre_arr = np.load(self._mask_paths_pre[index])["arr_0"]
+            mask_pre = torch.tensor(mask_pre_arr)
+            image_post = read_image(str(self._image_paths_post[index]))
+            mask_post_arr = np.load(self._mask_paths_post[index])["arr_0"]
+            mask_post = torch.tensor(mask_post_arr)
+            return (image_pre, mask_pre), (image_post, mask_post)
+        except Exception as e:
+            print(f"Index {index}")
+            raise e
 
     def __len__(self) -> int:
-        return len(self._image_paths)
+        return len(self._image_paths_pre)
 
 
 class XBDDataModule(pl.LightningDataModule):
@@ -139,13 +165,16 @@ class XBDDataModule(pl.LightningDataModule):
         val_faction: float | None = None,
         test_fraction: float | None = None,
         split_events: dict[Split, dict[Subset, Sequence[Event]]] | None = None,
+        train_batch_size: int | None = None,
+        val_batch_size: int | None = None,
+        test_batch_size: int | None = None,
     ) -> None:
         """
         Init the class. Supports building splitting int train / val / test by either explicit
         event specification, or random split with given dataset fractions.
         Assumes the dataset is structured as follows:
         - path
-          - geotiffs
+          - images
             - hold
               - images
                 - guatemala-volcano_00000001_pre_disaster.tif
@@ -181,6 +210,9 @@ class XBDDataModule(pl.LightningDataModule):
             test_fraction: If using split by fraction, fraction of data to put in the test dataset. Defaults to None.
             split_events: If using explicit split by event, a mapping of split name (train / val / test) to
                 a mapping of subset to list of events to use. Defaults to None.
+            train_batch_size: Batch size to use during training. Defaults to None (raises if DataLoader is requested).
+            val_batch_size: Batch size to use during validation. Defaults to None (raises if DataLoader is requested).
+            test_batch_size: Batch size to use during testing. Defaults to None (raises if DataLoader is requested).
 
         Raises:
             AssertionError: Argument validation failed
@@ -236,6 +268,10 @@ class XBDDataModule(pl.LightningDataModule):
         else:
             raise RuntimeError("Cannot split by fraction or event")
 
+        self._train_batch_size = train_batch_size
+        self._val_batch_size = val_batch_size
+        self._test_batch_size = test_batch_size
+
     def prepare_data(self) -> None:
         """Prepare the dataset. This function should only be called by the pytorch-lightning framework.
 
@@ -246,17 +282,15 @@ class XBDDataModule(pl.LightningDataModule):
 
         if self._split_by_event:
             assert self._split_events
-            self._train_dataset = LazySegmentationDataset(
-                *zip(*self._get_image_mask_paths(self._split_events["train"]))
-            )
-            self._val_dataset = LazySegmentationDataset(*zip(*self._get_image_mask_paths(self._split_events["val"])))
-            self._test_dataset = LazySegmentationDataset(*zip(*self._get_image_mask_paths(self._split_events["test"])))
+            self._train_dataset = XBDDataset(*zip(*self._get_image_mask_paths(self._split_events["train"])))
+            self._val_dataset = XBDDataset(*zip(*self._get_image_mask_paths(self._split_events["val"])))
+            self._test_dataset = XBDDataset(*zip(*self._get_image_mask_paths(self._split_events["test"])))
         elif self._split_by_fraction:
             # silence mypy
             assert self._val_fraction is not None
             assert self._test_fraction is not None
 
-            all_events_dataset = LazySegmentationDataset(*zip(*self._get_image_mask_paths(self._events)))
+            all_events_dataset = XBDDataset(*zip(*self._get_image_mask_paths(self._events)))
 
             val_size = int(len(all_events_dataset) * self._val_fraction)
             test_size = int(len(all_events_dataset) * self._test_fraction)
@@ -278,42 +312,30 @@ class XBDDataModule(pl.LightningDataModule):
             A list of image path + mask path pairs for every photo of given events in subsets.
         """
         return [
-            (path, self._path / "masks" / path.relative_to(self._path / "geotiffs").with_suffix(".npz"))
+            (path, self._path / "masks" / path.relative_to(self._path / "images").with_suffix(".npz"))
             for subset, subset_events in subset_events.items()
             for event in subset_events
-            for path in (self._path / "geotiffs" / subset.__name__.lower() / "images").iterdir()
+            for path in (self._path / "images" / subset.__name__.lower() / "images").iterdir()
             if path.name.startswith(event.value)
         ]
 
+    def train_dataloader(self) -> TRAIN_DATALOADERS:
+        if not self._train_batch_size:
+            raise RuntimeError(f"Requested train dataloader, but train batch size is {self._train_batch_size}")
+        return DataLoader(
+            self._train_dataset, batch_size=self._train_batch_size, num_workers=os.cpu_count() or 8, pin_memory=True, shuffle=True
+        )
 
-if __name__ == "__main__":
-    # foo = XDBDataModule(
-    #     path=Path("data/xBD"),
-    #     split_events={
-    #         "train": {Tier1: list(Tier1.events), Tier3: list(Tier3.events)},
-    #         "val": {
-    #             Hold: list(Hold.events),
-    #         },
-    #         "test": {
-    #             Test: list(Test.events),
-    #         },
-    #     },
-    # )
-    # foo.prepare_data()
+    def val_dataloader(self) -> TRAIN_DATALOADERS:
+        if not self._val_batch_size:
+            raise RuntimeError(f"Requested val dataloader, but val batch size is {self._val_batch_size}")
+        return DataLoader(
+            self._val_dataset, batch_size=self._val_batch_size, num_workers=os.cpu_count() or 8, pin_memory=True
+        )
 
-    foo = XBDDataModule(
-        path=Path("data/xBD"),
-        events={
-            Tier1: [
-                Event.hurricane_harvey,
-                Event.santa_rosa_wildfire,
-                Event.palu_tsunami,
-            ],
-            Tier3: list(Tier3.events),
-            Hold: list(Hold.events),
-            Test: list(Test.events),
-        },
-        val_faction=0.1,
-        test_fraction=0.1,
-    )
-    foo.prepare_data()
+    def test_dataloader(self) -> TRAIN_DATALOADERS:
+        if not self._test_batch_size:
+            raise RuntimeError(f"Requested test dataloader, but test batch size is {self._test_batch_size}")
+        return DataLoader(
+            self._test_dataset, batch_size=self._test_batch_size, num_workers=os.cpu_count() or 8, pin_memory=True
+        )
