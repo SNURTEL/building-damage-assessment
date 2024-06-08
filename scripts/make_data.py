@@ -154,7 +154,7 @@ if __name__ == "__main__":
     OUT_JPEGS_PATH = OUT_PATH / "jpegs"
 
     IMG_SIZE = 1024
-    PATCH_SIZE = 512
+    PATCH_SIZE = 256
 
     rglob = "*/*.tif"
     num_images = len(list(DATASET_PATH.rglob(rglob)))
