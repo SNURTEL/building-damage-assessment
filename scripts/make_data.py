@@ -20,6 +20,7 @@ from tqdm import tqdm  # type: ignore[import-untyped]
 
 
 class BuildingDamage(str, Enum):
+    background = "background"
     no_damage = "no-damage"
     minor_damage = "minor-damage"
     major_damage = "major-damage"
@@ -28,11 +29,12 @@ class BuildingDamage(str, Enum):
 
 
 _damage_to_label = {
-    BuildingDamage.no_damage: 0,
-    BuildingDamage.minor_damage: 1,
-    BuildingDamage.major_damage: 2,
-    BuildingDamage.destroyed: 3,
-    BuildingDamage.un_classifeid: 4,
+    BuildingDamage.background: 0,
+    BuildingDamage.no_damage: 1,
+    BuildingDamage.minor_damage: 2,
+    BuildingDamage.major_damage: 3,
+    BuildingDamage.destroyed: 4,
+    BuildingDamage.un_classifeid: 5,
 }
 
 
@@ -137,8 +139,10 @@ def make_mask(labels_path: Path | str, img_size: tuple[int, int]) -> np.ndarray:
         for k, group in grouped.items()
     }
 
-    rasterized_layers = [rasterized.get(i, np.zeros(img_size, dtype=np.uint8)) for i in range(5)]
-    return np.stack(rasterized_layers).transpose((1, 2, 0))  # type: ignore[no-any-return]
+    rasterized_layers = [rasterized.get(i, np.zeros(img_size, dtype=np.uint8)) for i in range(6)]
+    stacked = np.stack(rasterized_layers)
+    stacked[0] = (stacked.sum(axis=0) == 0).astype(np.uint8) 
+    return stacked.transpose((1, 2, 0))  # type: ignore[no-any-return]
 
 
 def img_path_to_labels_path(img_path: Path) -> Path:
@@ -212,7 +216,9 @@ if __name__ == "__main__":
             )
 
             for patch_num, out_path in enumerate(out_paths):
-                save(out_path, patches[patch_num % n_patches_h, patch_num // n_patches_w, 0])
+                patch = patches[patch_num % n_patches_h, patch_num // n_patches_w, 0]
+                save(out_path, patch)
+
 
 
     def wrapper(img_path: Path, todos: Collection[todos_t]) -> Path:
