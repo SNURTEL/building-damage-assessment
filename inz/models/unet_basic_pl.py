@@ -45,20 +45,24 @@ class SemanticSegmentor(pl.LightningModule):
     def training_step(self, batch: list[Tensor], batch_idx: int):  # type: ignore[no-untyped-def]
         images_pre, masks_pre, images_post, masks_post = batch
 
-        loc_preds = self.model(images_pre)
-        loc_y = masks_pre.argmax(dim=1).gt(0).to(torch.float)
-        loc_loss = self.localization_loss(
-            loc_preds.argmax(dim=1).gt(0).to(torch.float), 
-            loc_y
-        )
+        # loc_preds = self.model(images_pre)
+        # loc_y = masks_pre.argmax(dim=1).gt(0).to(torch.float)
+        # loc_loss = self.localization_loss(
+        #     loc_preds.argmax(dim=1).gt(0).to(torch.float),
+        #     loc_y
+        # )
 
         cls_preds = self.model(images_post)
-        cls_loss = self.classification_loss(cls_preds, masks_post.argmax(dim=1).gt(0).to(torch.long))
+        cls_loss = self.classification_loss(cls_preds, masks_post.argmax(dim=1))
 
         # total_loss = loc_loss + cls_loss
         total_loss = cls_loss
 
-        log_dict = {"loc_loss": loc_loss, "cls_loss": cls_loss, "loss": total_loss}
+        log_dict = {
+            # "loc_loss": loc_loss,
+            "cls_loss": cls_loss,
+            "loss": total_loss,
+        }
         self.log_dict(log_dict, prog_bar=True)
 
         return log_dict
@@ -116,3 +120,59 @@ class OrdinalCrossEntropyLoss(nn.Module):
         ce_loss = F.cross_entropy(y_hat, y, reduction=self.reduction, weight=self.weights)
         distance_weight = torch.abs(y_hat.argmax(1) - y) + 1
         return torch.mean(distance_weight * ce_loss)
+
+
+class DiceLoss(nn.Module):
+    def __init__(self, weight=None, normalization="sigmoid"):  # type: ignore
+        super(DiceLoss, self).__init__()
+        self.register_buffer("weight", weight)
+        assert normalization in ["sigmoid", "softmax", "none"]
+        if normalization == "sigmoid":
+            self.normalization = nn.Sigmoid()
+        elif normalization == "softmax":
+            self.normalization = nn.Softmax(dim=1)
+        else:
+            self.normalization = lambda x: x
+
+    @staticmethod
+    def flatten(tensor):  # type: ignore
+        """Flattens a given tensor such that the channel axis is first.
+        The shapes are transformed as follows:
+        (N, C, D, H, W) -> (C, N * D * H * W)
+        """
+        # number of channels
+        C = tensor.size(1)
+        # new axis order
+        axis_order = (1, 0) + tuple(range(2, tensor.dim()))
+        # Transpose: (N, C, D, H, W) -> (C, N, D, H, W)
+        transposed = tensor.permute(axis_order)
+        # Flatten: (C, N, D, H, W) -> (C, N * D * H * W)
+        return transposed.contiguous().view(C, -1)
+
+    def dice(self, input, target, weight, epsilon=1e-6):  # type: ignore
+        print(input.shape, target.shape)
+
+        assert input.size() == target.size(), "'input' and 'target' must have the same shape"
+
+        input = self.flatten(input)
+        target = self.flatten(target)
+        target = target.float()
+
+        # compute per channel Dice Coefficient
+        intersect = (input * target).sum(-1)
+        if weight is not None:
+            intersect = weight * intersect
+
+        # here we can use standard dice (input + target).sum(-1) or extension (see V-Net) (input^2 + target^2).sum(-1)
+        denominator = (input * input).sum(-1) + (target * target).sum(-1)
+        return 2 * (intersect / denominator.clamp(min=epsilon))
+
+    def forward(self, input, target):  # type: ignore
+        # get probabilities from logits
+        input = self.normalization(input)
+
+        # compute per channel Dice coefficient
+        per_channel_dice = self.dice(input, target, weight=self.weight)
+
+        # average Dice score across all channels/classes
+        return 1.0 - torch.mean(per_channel_dice)
