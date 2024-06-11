@@ -41,9 +41,14 @@ class XBDDataset(Dataset):
             self._mask_paths_post
         ), f"Got a different number of pre ({len(self._mask_paths_pre)}) and post ({len(self._mask_paths_post)}) masks"
 
-        self.image_transform = transforms.Compose([
-            transforms.Normalize(0.5,0.5),
-        ])
+        assert len(self._image_paths_pre) + len(self._image_paths_post) == len(image_paths)
+        assert len(self._mask_paths_pre) + len(self._mask_paths_post) == len(mask_paths)
+
+        self.image_transform = transforms.Compose(
+            [
+                transforms.Normalize(0.5, 0.5),
+            ]
+        )
 
     def __getitem__(self, index: int) -> tuple[tuple[torch.Tensor, torch.Tensor], tuple[torch.Tensor, torch.Tensor]]:
         image_pre = read_image(str(self._image_paths_pre[index])).to(torch.float) / 255
@@ -186,9 +191,12 @@ class XBDDataModule(pl.LightningDataModule):
 
         if self._split_by_event:
             assert self._split_events
-            self._train_dataset = XBDDataset(*zip(*self._get_image_mask_paths(self._split_events["train"])))
-            self._val_dataset = XBDDataset(*zip(*self._get_image_mask_paths(self._split_events["val"])))
-            self._test_dataset = XBDDataset(*zip(*self._get_image_mask_paths(self._split_events["test"])))
+            if self._split_events.get("train"):
+                self._train_dataset = XBDDataset(*zip(*self._get_image_mask_paths(self._split_events["train"])))
+            if self._split_events.get("val"):
+                self._val_dataset = XBDDataset(*zip(*self._get_image_mask_paths(self._split_events["val"])))
+            if self._split_events.get("test"):
+                self._test_dataset = XBDDataset(*zip(*self._get_image_mask_paths(self._split_events["test"])))
         elif self._split_by_fraction:
             # silence mypy
             assert self._val_fraction is not None
@@ -196,9 +204,13 @@ class XBDDataModule(pl.LightningDataModule):
 
             all_events_dataset = XBDDataset(*zip(*self._get_image_mask_paths(self._events)))
 
+            assert len(self._get_image_mask_paths(self._events)) == len(set(self._get_image_mask_paths(self._events)))
+
             val_size = int(len(all_events_dataset) * self._val_fraction)
             test_size = int(len(all_events_dataset) * self._test_fraction)
             train_size = len(all_events_dataset) - val_size - test_size
+
+            assert train_size + val_size + test_size == len(all_events_dataset)
 
             self._train_dataset, self._val_dataset, self._test_dataset = random_split(
                 all_events_dataset, [train_size, val_size, test_size]
@@ -215,13 +227,16 @@ class XBDDataModule(pl.LightningDataModule):
         Returns:
             A list of image path + mask path pairs for every photo of given events in subsets.
         """
-        return [
+        out = [
             (path, self._path / "masks" / path.relative_to(self._path / "images").with_suffix(".npz"))
             for subset, subset_events in subset_events.items()
             for event in subset_events
             for path in (self._path / "images" / subset.__name__.lower() / "images").iterdir()
             if path.name.startswith(event.value)
         ]
+        # assert len({i for i, _ in out}) == len([i for i, _ in out])
+        # assert len({m for _, m in out}) == len([m for _, m in out])
+        return out
 
     def train_dataloader(self) -> TRAIN_DATALOADERS:
         if not self._train_batch_size:
@@ -236,13 +251,9 @@ class XBDDataModule(pl.LightningDataModule):
     def val_dataloader(self) -> TRAIN_DATALOADERS:
         if not self._val_batch_size:
             raise RuntimeError(f"Requested val dataloader, but val batch size is {self._val_batch_size}")
-        return DataLoader(
-            self._val_dataset, batch_size=self._val_batch_size, num_workers=os.cpu_count() or 8
-        )
+        return DataLoader(self._val_dataset, batch_size=self._val_batch_size, num_workers=os.cpu_count() or 8, pin_memory=True, persistent_workers=True)
 
     def test_dataloader(self) -> TRAIN_DATALOADERS:
         if not self._test_batch_size:
             raise RuntimeError(f"Requested test dataloader, but test batch size is {self._test_batch_size}")
-        return DataLoader(
-            self._test_dataset, batch_size=self._test_batch_size, num_workers=os.cpu_count() or 8
-        )
+        return DataLoader(self._test_dataset, batch_size=self._test_batch_size, num_workers=os.cpu_count() or 8, pin_memory=True, persistent_workers=True)
