@@ -25,6 +25,10 @@ dependencies = [
     "mlflow>=2.13.2",
     "rich>=13.7.1",
     "tensorboard>=2.17.0",
+    "wandb>=0.18.1",
+    "segmentation-models-pytorch>=0.3.3",
+    "python-dotenv>=1.0.1",
+    "types-tqdm>=4.66.0.20240417",
 ]
 requires-python = "==3.11.*"
 readme = "README.md"
