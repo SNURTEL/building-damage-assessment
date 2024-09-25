@@ -1,0 +1,11 @@
+module:
+  _target_: inz.models.baseline_module.BaselineModule
+  _partial_: True
+  model:
+    _target_: inz.xview2_strong_baseline.legacy.zoo.models.Res34_Unet_Double
+    pretrained: True
+  loss:
+    _target_: inz.xview2_strong_baseline.legacy.losses.ComboLoss
+    weights:
+      dice: 1
+      focal: 1

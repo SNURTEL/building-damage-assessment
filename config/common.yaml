@@ -1,0 +1,14 @@
+defaults:
+  - _self_
+  - trainer: trainer
+  - datamodule: datamodule
+  - module: module
+
+seed: 57
+float32_matmul_precision: high
+log_dir: logs
+checkpoint_dir: checkpoints
+project_name: inz
+
+raw_data_path: data/xBD
+preprocessed_data_path: data/xBD_processed

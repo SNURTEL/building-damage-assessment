@@ -1,17 +1,23 @@
+import os
 from typing import Iterable
 
 import numpy as np
 import torch
 import torchvision.transforms.functional as T  # type: ignore[import-untyped]
 from matplotlib import pyplot as plt
+from pytorch_lightning.loggers import WandbLogger
 from torch import Tensor as Ts
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
 from torchvision.utils import draw_segmentation_masks, make_grid  # type: ignore[import-untyped]
 from tqdm import tqdm
 
+import wandb
 
-def get_loc_cls_weights(dataloader: DataLoader, device: torch.device | None = None) -> tuple[Ts, Ts]:
+
+def get_loc_cls_weights(
+    dataloader: DataLoader, device: torch.device | None = None, drop_unclassified_class: bool = False
+) -> tuple[Ts, Ts]:
     """Iterate over a DataLoader and compute weights for localization and classification tasks.
     - Loc weights are computed as sum(cls==0)/n, sum(cls>0)/n. Shape = (2).
     - Cls weights are computed as sum(cls==c)/n. Shape = (C).
@@ -29,13 +35,15 @@ def get_loc_cls_weights(dataloader: DataLoader, device: torch.device | None = No
     """
     device = device or torch.cuda.current_device  # type: ignore[assignment]
 
+    n_classes = 5 if drop_unclassified_class else 6
+
     aaa_loc = []
     aaa_cls = []
-    for batch in tqdm(dataloader):
+    for batch in tqdm(dataloader, desc="Computing class weights"):
         _, pre_masks, _, post_masks = batch
-        counts_post = torch.bincount(post_masks.argmax(dim=1).reshape(-1), minlength=6)
+        counts_post = torch.bincount(post_masks.argmax(dim=1).reshape(-1), minlength=n_classes)
         aaa_cls.append(counts_post)
-        counts_pre = torch.bincount(pre_masks.argmax(dim=1).reshape(-1), minlength=6)
+        counts_pre = torch.bincount(pre_masks.argmax(dim=1).reshape(-1), minlength=n_classes)
         aaa_loc.append(torch.tensor([counts_pre[0], counts_pre[1:].sum()]))
 
     loc_counts = torch.stack(aaa_loc).sum(dim=0).to(torch.float)
@@ -44,9 +52,11 @@ def get_loc_cls_weights(dataloader: DataLoader, device: torch.device | None = No
     loc_weights = loc_counts.sum() / loc_counts
     loc_weights = (loc_weights / loc_weights.sum()).to(device)
     cls_weights = cls_counts.sum() / cls_counts
-    cls_weights = (cls_weights / cls_weights.sum()).to(device) * torch.tensor(
-        [1, 1, 1, 1, 1, 0]  # last class is "unclassified"
-    ).to(device)
+    cls_weights = (cls_weights / cls_weights.sum()).to(device)
+    if not drop_unclassified_class:
+        cls_weights *= torch.tensor(
+            [1, 1, 1, 1, 1, 0]  # last class is "unclassified"
+        ).to(device)
     return loc_weights, cls_weights
 
 
@@ -124,3 +134,21 @@ def show_masks_comparison(
             "Predicted masks",
         ],
     )
+
+
+def get_wandb_logger(
+    api_key: str | None = None,
+    project: str = "inz",
+    watch_model: bool = True,
+    watch_model_log_frequency: int = 100,
+    watch_model_model: torch.nn.Module | None = None,
+) -> WandbLogger:
+    if not (WANDB_API_KEY := api_key):
+        assert (WANDB_API_KEY := os.getenv("WANDB_API_KEY")), "No API key specified"
+    wandb.login(key=WANDB_API_KEY, verify=True)
+    wandb_logger = WandbLogger(project=project)
+    if watch_model:
+        assert watch_model_model, "When watch_model=True, a model must be provided"
+        assert watch_model_log_frequency > 0, "When watch_model=True, logging frequency must be positive"
+        wandb_logger.watch(watch_model_model, log_freq=watch_model_log_frequency)
+    return wandb_logger

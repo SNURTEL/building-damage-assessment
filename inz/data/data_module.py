@@ -2,7 +2,7 @@ import itertools
 import os
 from collections import Counter
 from pathlib import Path
-from typing import Literal, Sequence
+from typing import Literal, Sequence, Any
 
 import numpy as np
 import pytorch_lightning as pl
@@ -12,6 +12,7 @@ from torchvision import transforms
 from torch.utils.data import DataLoader, Dataset, random_split
 from torchvision.io import read_image  # type: ignore[import-untyped]
 
+import inz.data.event
 from inz.data.event import Event, Hold, Subset, Test, Tier1, Tier3
 
 Split = Literal["train", "val", "test"]
@@ -20,14 +21,20 @@ Split = Literal["train", "val", "test"]
 class XBDDataset(Dataset):
     """Dataset class for the xBD dataset."""
 
-    def __init__(self, image_paths: Sequence[Path], mask_paths: Sequence[Path]) -> None:
+    def __init__(
+        self, image_paths: Sequence[Path], mask_paths: Sequence[Path], drop_unclassified_channel: bool = False
+    ) -> None:
         """Init the class
 
         Args:
             image_paths: Paths to image files
             mask_paths: Paths to mask files
+            drop_unclassified_channel: Whether to discard the 6th mask channel ("unclassified" class)
         """
         super(XBDDataset, self).__init__()
+
+        self.drop_unclassified_channel = drop_unclassified_channel
+
         assert len(image_paths) == len(mask_paths), "Image and mask paths must be of the same length"
         key = lambda p: "post_disaster" in p.name
         images_grouped = itertools.groupby(sorted(image_paths, key=key), key=key)
@@ -57,7 +64,15 @@ class XBDDataset(Dataset):
         image_post = read_image(str(self._image_paths_post[index])).to(torch.float) / 255
         mask_post_arr = np.load(self._mask_paths_post[index])["arr_0"]
         mask_post = torch.tensor(mask_post_arr, dtype=torch.float)
-        return self.image_transform(image_pre), mask_pre, self.image_transform(image_post), mask_post  # type: ignore[return-value]
+        if self.drop_unclassified_channel:
+            return (
+                self.image_transform(image_pre),
+                mask_pre[:-1, ...],
+                self.image_transform(image_post),
+                mask_post[:-1, ...],
+            )  # type: ignore[return-value]
+        else:
+            return self.image_transform(image_pre), mask_pre, self.image_transform(image_post), mask_post  # type: ignore[return-value]
 
     def __len__(self) -> int:
         return len(self._image_paths_pre)
@@ -66,16 +81,35 @@ class XBDDataset(Dataset):
 class XBDDataModule(pl.LightningDataModule):
     """DataModule for the xBD dataset."""
 
+    @classmethod
+    def create(cls, *args: list[Any], **kwargs: dict[str, Any]):
+        # Just to make hydra happy with using enums as dict keys
+        if kwargs.get("events"):
+            kwargs["events"] = {
+                getattr(inz.data.event, subset_string_k.split(".")[-1]): [Event[event.split(".")[-1]] for event in events_v]
+                for subset_string_k, events_v in kwargs["events"].items()
+            }
+
+        if kwargs.get("split_events"):
+            kwargs["split_events"] = { split_k.split(".")[-1]: {
+                    getattr(inz.data.event, subset_string_k.split(".")[-1]): [Event[event.split(".")[-1]] for event in events_v]
+                    for subset_string_k, events_v in subsets_v.items()
+                } for split_k, subsets_v in kwargs["split_events"]
+            }
+        
+        return cls(*args, **kwargs)
+
     def __init__(
         self,
         path: Path | str,
         events: dict[Subset, Sequence[Event]] | None = None,
-        val_faction: float | None = None,
+        val_fraction: float | None = None,
         test_fraction: float | None = None,
         split_events: dict[Split, dict[Subset, Sequence[Event]]] | None = None,
         train_batch_size: int | None = None,
         val_batch_size: int | None = None,
         test_batch_size: int | None = None,
+        drop_unclassified_channel: bool = False,
     ) -> None:
         """
         Init the class. Supports building splitting int train / val / test by either explicit
@@ -121,6 +155,7 @@ class XBDDataModule(pl.LightningDataModule):
             train_batch_size: Batch size to use during training. Defaults to None (raises if DataLoader is requested).
             val_batch_size: Batch size to use during validation. Defaults to None (raises if DataLoader is requested).
             test_batch_size: Batch size to use during testing. Defaults to None (raises if DataLoader is requested).
+            drop_unclassified_channel: Whether to discard the 6th mask channel ("unclassified" class)
 
         Raises:
             AssertionError: Argument validation failed
@@ -128,18 +163,20 @@ class XBDDataModule(pl.LightningDataModule):
         """
         super(XBDDataModule, self).__init__()
 
+        self.drop_unclassified_channel = drop_unclassified_channel
+
         # TODO group pre and post disaster
 
-        self._split_by_fraction = val_faction is not None and test_fraction is not None and split_events is None
+        self._split_by_fraction = val_fraction is not None and test_fraction is not None and split_events is None
         self._split_by_event = (
-            events is None and val_faction is None and test_fraction is None and split_events is not None
+            events is None and val_fraction is None and test_fraction is None and split_events is not None
         )
         assert (
             self._split_by_fraction != self._split_by_event
         ), 'Either provide "val_fraction" + "test_fraction" + "events" (optionally) or "events_split" without "events"'
 
         self._path = Path(path)
-        self._val_fraction = val_faction
+        self._val_fraction = val_fraction
         self._test_fraction = test_fraction
         self._split_events = split_events
 
@@ -152,11 +189,11 @@ class XBDDataModule(pl.LightningDataModule):
 
         if self._split_by_fraction:
             # silence mypy
-            assert val_faction is not None
+            assert val_fraction is not None
             assert test_fraction is not None
 
-            assert val_faction + test_fraction <= 1, "val_fraction + test_fraction cannot be greater that 1"
-            assert val_faction >= 0 and test_fraction >= 0, "val_fraction and test_fraction cannot be negative"
+            assert val_fraction + test_fraction <= 1, "val_fraction + test_fraction cannot be greater that 1"
+            assert val_fraction >= 0 and test_fraction >= 0, "val_fraction and test_fraction cannot be negative"
 
             for subset, subset_events in self._events.items():
                 assert (
@@ -192,17 +229,29 @@ class XBDDataModule(pl.LightningDataModule):
         if self._split_by_event:
             assert self._split_events
             if self._split_events.get("train"):
-                self._train_dataset = XBDDataset(*zip(*self._get_image_mask_paths(self._split_events["train"])))
+                self._train_dataset = XBDDataset(
+                    *zip(*self._get_image_mask_paths(self._split_events["train"])),
+                    drop_unclassified_channel=self.drop_unclassified_channel,
+                )
             if self._split_events.get("val"):
-                self._val_dataset = XBDDataset(*zip(*self._get_image_mask_paths(self._split_events["val"])))
+                self._val_dataset = XBDDataset(
+                    *zip(*self._get_image_mask_paths(self._split_events["val"])),
+                    drop_unclassified_channel=self.drop_unclassified_channel,
+                )
             if self._split_events.get("test"):
-                self._test_dataset = XBDDataset(*zip(*self._get_image_mask_paths(self._split_events["test"])))
+                self._test_dataset = XBDDataset(
+                    *zip(*self._get_image_mask_paths(self._split_events["test"])),
+                    drop_unclassified_channel=self.drop_unclassified_channel,
+                )
         elif self._split_by_fraction:
             # silence mypy
             assert self._val_fraction is not None
             assert self._test_fraction is not None
 
-            all_events_dataset = XBDDataset(*zip(*self._get_image_mask_paths(self._events)))
+            all_events_dataset = XBDDataset(
+                *zip(*self._get_image_mask_paths(self._events)),
+                drop_unclassified_channel=self.drop_unclassified_channel,
+            )
 
             assert len(self._get_image_mask_paths(self._events)) == len(set(self._get_image_mask_paths(self._events)))
 
@@ -251,9 +300,21 @@ class XBDDataModule(pl.LightningDataModule):
     def val_dataloader(self) -> TRAIN_DATALOADERS:
         if not self._val_batch_size:
             raise RuntimeError(f"Requested val dataloader, but val batch size is {self._val_batch_size}")
-        return DataLoader(self._val_dataset, batch_size=self._val_batch_size, num_workers=os.cpu_count() or 8, pin_memory=True, persistent_workers=True)
+        return DataLoader(
+            self._val_dataset,
+            batch_size=self._val_batch_size,
+            num_workers=os.cpu_count() or 8,
+            pin_memory=True,
+            persistent_workers=True,
+        )
 
     def test_dataloader(self) -> TRAIN_DATALOADERS:
         if not self._test_batch_size:
             raise RuntimeError(f"Requested test dataloader, but test batch size is {self._test_batch_size}")
-        return DataLoader(self._test_dataset, batch_size=self._test_batch_size, num_workers=os.cpu_count() or 8, pin_memory=True, persistent_workers=True)
+        return DataLoader(
+            self._test_dataset,
+            batch_size=self._test_batch_size,
+            num_workers=os.cpu_count() or 8,
+            pin_memory=True,
+            persistent_workers=True,
+        )

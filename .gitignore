@@ -229,3 +229,6 @@ models/*
 data/*
 
 mlruns
+checkpoints
+wandb
+.ipynb_checkpoints
