@@ -1,14 +1,32 @@
 defaults:
+  - trainer: default
+  - datamodule: default
+  - module: default
   - _self_
-  - trainer: trainer
-  - datamodule: datamodule
-  - module: module
 
 seed: 57
 float32_matmul_precision: high
-log_dir: logs
-checkpoint_dir: checkpoints
+checkpoint_dir: ${hydra:run.dir}/checkpoints
 project_name: inz
 
 raw_data_path: data/xBD
 preprocessed_data_path: data/xBD_processed
+
+# defined in datamodule, since this is the element we will be swapping out most often
+experiment_name: ${datamodule.experiment_name}
+
+hydra:
+  run:
+    dir: outputs/${hydra.job.name}/${now:%Y-%m-%d_%H-%M-%S}
+  job:
+    name: ${experiment_name}
+
+wandb_dir: ${hydra:run.dir}
+last_job_symlink_dir: outputs/${hydra:job.name}/latest_run
+
+
+last_ckpt_suffix: '-last'
+best_ckpt_suffix: '-best-f1'
+best_val_loss_ckpt_suffix: '-best-val-loss'
+
+resume_from_checkpoint: if_exists

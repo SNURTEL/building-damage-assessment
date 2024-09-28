@@ -8,5 +8,6 @@
     "editor.rulers": [120],
     "jupyter.notebookFileRoot": "${workspaceFolder}",
     "python.languageServer": "Pylance",
-
+    "editor.fontSize": 13,
+    "window.zoomLevel": 0.3
 }

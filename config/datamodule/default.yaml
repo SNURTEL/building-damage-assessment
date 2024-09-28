@@ -3,10 +3,12 @@ datamodule:
   path: '${preprocessed_data_path}'
   drop_unclassified_channel: True
   events:
-    inz.data.event.Tier3:
-      - inz.data.event.Event.joplin_tornado
+    Tier3:
+      - joplin_tornado
   val_fraction: 0.15
   test_fraction: 0.15
-  train_batch_size: 24
-  val_batch_size: 24
-  test_batch_size: 24
+  train_batch_size: 64
+  val_batch_size: 64
+  test_batch_size: 64
+
+experiment_name: test_experiment

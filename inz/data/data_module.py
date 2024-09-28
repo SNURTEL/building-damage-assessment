@@ -2,18 +2,22 @@ import itertools
 import os
 from collections import Counter
 from pathlib import Path
-from typing import Literal, Sequence, Any
+from typing import Any, Literal, Sequence
 
 import numpy as np
 import pytorch_lightning as pl
 import torch
 from pytorch_lightning.utilities.types import TRAIN_DATALOADERS
-from torchvision import transforms
 from torch.utils.data import DataLoader, Dataset, random_split
+from torchvision import transforms  # type: ignore[import-untyped]
 from torchvision.io import read_image  # type: ignore[import-untyped]
 
 import inz.data.event
 from inz.data.event import Event, Hold, Subset, Test, Tier1, Tier3
+
+# Keep this number low! More workers will marginally improve performance
+# at a cost of huge ram (and swap!!!) usage.
+DATALOADER_WORKER_COUNT = 2
 
 Split = Literal["train", "val", "test"]
 
@@ -82,22 +86,22 @@ class XBDDataModule(pl.LightningDataModule):
     """DataModule for the xBD dataset."""
 
     @classmethod
-    def create(cls, *args: list[Any], **kwargs: dict[str, Any]):
+    def create(cls, *args: list[Any], **kwargs: dict[str, Any]): # type: ignore[no-untyped-def]
         # Just to make hydra happy with using enums as dict keys
         if kwargs.get("events"):
             kwargs["events"] = {
-                getattr(inz.data.event, subset_string_k.split(".")[-1]): [Event[event.split(".")[-1]] for event in events_v]
+                getattr(inz.data.event, subset_string_k): [Event[event] for event in events_v]
                 for subset_string_k, events_v in kwargs["events"].items()
             }
 
         if kwargs.get("split_events"):
-            kwargs["split_events"] = { split_k.split(".")[-1]: {
-                    getattr(inz.data.event, subset_string_k.split(".")[-1]): [Event[event.split(".")[-1]] for event in events_v]
-                    for subset_string_k, events_v in subsets_v.items()
-                } for split_k, subsets_v in kwargs["split_events"]
+            kwargs["split_events"] = { split_k: {  # type: ignore
+                    getattr(inz.data.event, subset_string_k): [Event[event] for event in events_v]
+                    for subset_string_k, events_v in subsets_v.items()  # type: ignore
+                } for split_k, subsets_v in kwargs["split_events"].items()
             }
-        
-        return cls(*args, **kwargs)
+
+        return cls(*args, **kwargs)  # type: ignore
 
     def __init__(
         self,
@@ -229,18 +233,18 @@ class XBDDataModule(pl.LightningDataModule):
         if self._split_by_event:
             assert self._split_events
             if self._split_events.get("train"):
-                self._train_dataset = XBDDataset(
-                    *zip(*self._get_image_mask_paths(self._split_events["train"])),
+                self._train_dataset = XBDDataset( # type: ignore[arg-type, misc]
+                    *zip(*self._get_image_mask_paths(self._split_events["train"])),  # type: ignore[arg-type]
                     drop_unclassified_channel=self.drop_unclassified_channel,
                 )
             if self._split_events.get("val"):
-                self._val_dataset = XBDDataset(
-                    *zip(*self._get_image_mask_paths(self._split_events["val"])),
+                self._val_dataset = XBDDataset( # type: ignore[arg-type, misc]
+                    *zip(*self._get_image_mask_paths(self._split_events["val"])),  # type: ignore[arg-type]
                     drop_unclassified_channel=self.drop_unclassified_channel,
                 )
             if self._split_events.get("test"):
-                self._test_dataset = XBDDataset(
-                    *zip(*self._get_image_mask_paths(self._split_events["test"])),
+                self._test_dataset = XBDDataset( # type: ignore[arg-type, misc]
+                    *zip(*self._get_image_mask_paths(self._split_events["test"])),  # type: ignore[arg-type]
                     drop_unclassified_channel=self.drop_unclassified_channel,
                 )
         elif self._split_by_fraction:
@@ -248,8 +252,8 @@ class XBDDataModule(pl.LightningDataModule):
             assert self._val_fraction is not None
             assert self._test_fraction is not None
 
-            all_events_dataset = XBDDataset(
-                *zip(*self._get_image_mask_paths(self._events)),
+            all_events_dataset = XBDDataset( # type: ignore[misc]
+                *zip(*self._get_image_mask_paths(self._events)), # type: ignore[arg-type, misc]
                 drop_unclassified_channel=self.drop_unclassified_channel,
             )
 
@@ -293,8 +297,10 @@ class XBDDataModule(pl.LightningDataModule):
         return DataLoader(
             self._train_dataset,
             batch_size=self._train_batch_size,
-            num_workers=os.cpu_count() or 8,
+            num_workers=DATALOADER_WORKER_COUNT,
             shuffle=True,
+            pin_memory=True,
+            persistent_workers=True,
         )
 
     def val_dataloader(self) -> TRAIN_DATALOADERS:
@@ -303,7 +309,7 @@ class XBDDataModule(pl.LightningDataModule):
         return DataLoader(
             self._val_dataset,
             batch_size=self._val_batch_size,
-            num_workers=os.cpu_count() or 8,
+            num_workers=DATALOADER_WORKER_COUNT,
             pin_memory=True,
             persistent_workers=True,
         )
@@ -314,7 +320,7 @@ class XBDDataModule(pl.LightningDataModule):
         return DataLoader(
             self._test_dataset,
             batch_size=self._test_batch_size,
-            num_workers=os.cpu_count() or 8,
+            num_workers=DATALOADER_WORKER_COUNT,
             pin_memory=True,
             persistent_workers=True,
         )

@@ -232,3 +232,4 @@ mlruns
 checkpoints
 wandb
 .ipynb_checkpoints
+outputs

@@ -1,3 +1,4 @@
+from typing import Any, Callable
 
 import pytorch_lightning as pl
 import torch
@@ -10,22 +11,27 @@ from torch import Tensor
 
 
 class BaselineModule(pl.LightningModule):
-    def __init__(self,
-                 model: nn.Module,
-                 loss: nn.Module,
-                 class_weights: Tensor
-        ):
+    def __init__(
+        self,
+        model: nn.Module,
+        loss: nn.Module,
+        optimizer_factory: Callable[[Any], torch.optim.Optimizer],
+        scheduler_factory: Callable[[Any], torch.optim.lr_scheduler.LRScheduler] | None = None,
+        class_weights: Tensor | None = None,
+    ):
         super(BaselineModule, self).__init__()
         # n classes
         n_classes = 5
         self.n_classes = n_classes
 
-        self.class_weights = class_weights
+        self.class_weights = class_weights if class_weights is not None else Tensor([1, 1, 1, 1, 1])
 
-        self.save_hyperparameters(ignore=['model', "loss"])
+        self.save_hyperparameters(ignore=["model", "loss"])
 
         self.model = model
 
+        self.optimizer_factory = optimizer_factory
+        self.scheduler_factory = scheduler_factory
 
         # loss function
         self.loss_fn = loss
@@ -46,19 +52,25 @@ class BaselineModule(pl.LightningModule):
         self.iou_per_class = torchmetrics.segmentation.MeanIoU(num_classes=n_classes, per_class=True)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.model(x)
+        return self.model(x)  # type: ignore[no-any-return]
 
-    def loss(self, images_pre: Tensor, masks_pre: Tensor, images_post: Tensor, masks_post: Tensor) -> Tensor:
-        return self.loss_fn(self.forward(torch.cat([images_pre, images_post], dim=1)), masks_post.to(torch.float))  # type: ignore[no-any-return]
+    def loss(
+        self, images_pre: Tensor, masks_pre: Tensor, images_post: Tensor, masks_post: Tensor
+    ) -> tuple[Tensor, Tensor]:
+        preds = self.forward(torch.cat([images_pre, images_post], dim=1))
+        # per-class loss in unweighted!
+        class_loss = torch.stack(
+            [self.loss_fn(preds[:, i, ...], masks_post.to(torch.float)[:, i, ...]) for i in range(preds.shape[1])]
+        )
+        loss = class_loss.dot(self.class_weights).sum()
+
+        return loss, class_loss
 
     def training_step(self, batch: list[Tensor], batch_idx: int) -> Tensor:
-        images_pre, masks_pre, images_post, masks_post = batch
-        preds = self.forward(torch.cat([images_pre, images_post], dim=1))
-        loss = torch.stack([
-            self.loss_fn(preds[:, i, ...], masks_post.to(torch.float)[:, i, ...]) for i in range(preds.shape[1])
-        ]).dot(self.class_weights).sum()
-        # todo log loss on each class
-        self.log("train_loss", loss, prog_bar=True)
+        loss, class_loss = self.loss(*batch)
+
+        class_loss_dict = {f"train_loss_{i}": loss_val for i, loss_val in enumerate(class_loss)}
+        self.log_dict(class_loss_dict | {"train_loss": loss}, prog_bar=True)
         return loss  # type: ignore[no-any-return]
 
     def validation_step(self, batch: list[Tensor], batch_idx: int):  # type: ignore[no-untyped-def]
@@ -67,6 +79,9 @@ class BaselineModule(pl.LightningModule):
 
             cls_preds = self.forward(torch.cat([images_pre, images_post], dim=1))
             cls_preds_masks = F.one_hot(cls_preds.argmax(dim=1), num_classes=self.n_classes).moveaxis(-1, 1)
+
+            loss, class_loss = self.loss(*batch)
+
             log_dict = (
                 {
                     "acc_loc": self.accuracy_loc(
@@ -94,18 +109,17 @@ class BaselineModule(pl.LightningModule):
                     f"iou_{i}": val
                     for i, val in enumerate(self.iou_per_class(cls_preds_masks, masks_post.to(torch.uint8)))
                 }
-                | {"val_loss": self.loss(*batch)}
+                | {f"val_loss_{i}": loss_val for i, loss_val in enumerate(class_loss)}
+                | {"val_loss": loss}
             )
             self.log_dict(log_dict, prog_bar=True)
 
             return log_dict
 
-    # todo proper params + scheduler
     def configure_optimizers(self):  # type: ignore[no-untyped-def]
-        optimizer = torch.optim.AdamW(self.parameters(), lr=0.0002, weight_decay=1e-6)
-        scheduler = torch.optim.lr_scheduler.MultiStepLR(
-            optimizer=optimizer,
-            gamma=0.5,
-            milestones=[5, 11, 17, 23, 29, 33, 47, 50, 60, 70, 90, 110, 130, 150, 170, 180, 190]
-         )
-        return [optimizer], [scheduler]
+        optimizer = self.optimizer_factory(self.model.parameters())
+        if self.scheduler_factory:
+            scheduler = self.scheduler_factory(optimizer)
+            return [optimizer], [scheduler]
+        else:
+            return optimizer

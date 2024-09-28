@@ -4,6 +4,7 @@ from typing import Iterable
 import numpy as np
 import torch
 import torchvision.transforms.functional as T  # type: ignore[import-untyped]
+import wandb
 from matplotlib import pyplot as plt
 from pytorch_lightning.loggers import WandbLogger
 from torch import Tensor as Ts
@@ -12,11 +13,9 @@ from torch.utils.data import DataLoader
 from torchvision.utils import draw_segmentation_masks, make_grid  # type: ignore[import-untyped]
 from tqdm import tqdm
 
-import wandb
-
 
 def get_loc_cls_weights(
-    dataloader: DataLoader, device: torch.device | None = None, drop_unclassified_class: bool = False
+    dataloader: DataLoader, device: torch.device | None = None, drop_unclassified_class: bool = False,
 ) -> tuple[Ts, Ts]:
     """Iterate over a DataLoader and compute weights for localization and classification tasks.
     - Loc weights are computed as sum(cls==0)/n, sum(cls>0)/n. Shape = (2).
@@ -137,18 +136,33 @@ def show_masks_comparison(
 
 
 def get_wandb_logger(
+    run_name: str | None = None,
+    dir: str | None = None,
     api_key: str | None = None,
     project: str = "inz",
-    watch_model: bool = True,
+    watch_model: bool = False,
     watch_model_log_frequency: int = 100,
     watch_model_model: torch.nn.Module | None = None,
 ) -> WandbLogger:
     if not (WANDB_API_KEY := api_key):
         assert (WANDB_API_KEY := os.getenv("WANDB_API_KEY")), "No API key specified"
     wandb.login(key=WANDB_API_KEY, verify=True)
-    wandb_logger = WandbLogger(project=project)
+    # log_model=True respects lightning's save_top_k, setting to 'all' logs all intermediate checkpoints
+    wandb_logger = WandbLogger(project=project, log_model=True, save_dir=dir, name=run_name)
     if watch_model:
         assert watch_model_model, "When watch_model=True, a model must be provided"
         assert watch_model_log_frequency > 0, "When watch_model=True, logging frequency must be positive"
         wandb_logger.watch(watch_model_model, log_freq=watch_model_log_frequency)
     return wandb_logger
+
+
+def nested_dict_to_tuples(d: dict) -> tuple:
+    out = []
+    for k, v in d.items():
+        if isinstance(v, dict):
+            out.append((k, nested_dict_to_tuples(v)))
+        elif isinstance(v, list):
+            out.append((k, tuple(v)))
+        else:
+            out.append((k, v))
+    return tuple(out)
