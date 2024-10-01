@@ -24,5 +24,18 @@
             0.42663896083831787,
             0.2316141128540039
         ]
+    },
+    "(('train', (('Tier1', ('guatemala_volcano', 'mexico_earthquake', 'midwest_flooding', 'palu_tsunami', 'santa_rosa_wildfire', 'socal_fire')), ('Hold', ('guatemala_volcano', 'mexico_earthquake', 'midwest_flooding', 'palu_tsunami', 'santa_rosa_wildfire', 'socal_fire')), ('Test', ('guatemala_volcano', 'mexico_earthquake', 'midwest_flooding', 'palu_tsunami', 'santa_rosa_wildfire', 'socal_fire')), ('Tier3', ('joplin_tornado', 'lower_puna_volcano', 'moore_tornado', 'nepal_flooding', 'pinery_bushfire', 'portugal_wildfire', 'sunda_tsunami', 'tuscaloosa_tornado', 'woolsey_fire')))), ('val', (('Tier1', ('hurricane_florence', 'hurricane_harvey', 'hurricane_matthew', 'hurricane_michael')), ('Hold', ('hurricane_florence', 'hurricane_harvey', 'hurricane_matthew', 'hurricane_michael')), ('Test', ('hurricane_florence', 'hurricane_harvey', 'hurricane_matthew', 'hurricane_michael')))))": {
+        "loc": [
+            0.027361195534467697,
+            0.9726388454437256
+        ],
+        "cls": [
+            0.0003537119773682207,
+            0.01490691863000393,
+            0.35847243666648865,
+            0.4620252251625061,
+            0.16424168646335602
+        ]
     }
 }

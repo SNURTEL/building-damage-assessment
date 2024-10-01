@@ -1,0 +1,59 @@
+datamodule:
+  _target_: inz.data.data_module.XBDDataModule.create
+  path: '${preprocessed_data_path}'
+  drop_unclassified_channel: True
+  split_events:
+    train:
+      Tier1:
+        - guatemala_volcano
+        - hurricane_florence
+        - hurricane_harvey
+        - hurricane_matthew
+        - hurricane_michael
+        - mexico_earthquake
+        - midwest_flooding
+        - palu_tsunami
+      Hold:
+        - guatemala_volcano
+        - hurricane_florence
+        - hurricane_harvey
+        - hurricane_matthew
+        - hurricane_michael
+        - mexico_earthquake
+        - midwest_flooding
+        - palu_tsunami
+      Test:
+        - guatemala_volcano
+        - hurricane_florence
+        - hurricane_harvey
+        - hurricane_matthew
+        - hurricane_michael
+        - mexico_earthquake
+        - midwest_flooding
+        - palu_tsunami
+      Tier3:
+        - joplin_tornado
+        - lower_puna_volcano
+        - moore_tornado
+        - nepal_flooding
+        - sunda_tsunami
+        - tuscaloosa_tornado
+    val:
+      Tier1:
+        - santa_rosa_wildfire
+        - socal_fire
+      Hold:
+        - santa_rosa_wildfire
+        - socal_fire
+      Test:
+        - santa_rosa_wildfire
+        - socal_fire
+      Tier3:
+        - pinery_bushfire
+        - portugal_wildfire
+        - woolsey_fire
+  train_batch_size: 144
+  val_batch_size: 144
+  test_batch_size: 144
+
+experiment_name: val_on_fires
