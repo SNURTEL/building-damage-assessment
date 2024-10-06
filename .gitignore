@@ -233,3 +233,4 @@ checkpoints
 wandb
 .ipynb_checkpoints
 outputs
+lightning_logs

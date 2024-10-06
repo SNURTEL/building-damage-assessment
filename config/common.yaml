@@ -11,6 +11,7 @@ project_name: inz
 
 raw_data_path: data/xBD
 preprocessed_data_path: data/xBD_processed
+preprocessed_data_path_fullres: data/xBD_processed_noresize
 
 # defined in datamodule, since this is the element we will be swapping out most often
 experiment_name: ${datamodule.experiment_name}

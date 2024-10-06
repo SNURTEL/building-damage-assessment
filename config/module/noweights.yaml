@@ -1,0 +1,40 @@
+module:
+  _target_: inz.models.baseline_module.BaselineModule
+  _partial_: True
+  model:
+    _target_: inz.xview2_strong_baseline.legacy.zoo.models.Res34_Unet_Double
+    pretrained: True
+  loss:
+    _target_: inz.xview2_strong_baseline.legacy.losses.ComboLoss
+    weights:
+      dice: 1
+      focal: 1
+  optimizer_factory:
+    _target_: torch.optim.AdamW
+    _partial_: True
+    lr: 0.0002
+    weight_decay: 1e-6
+  scheduler_factory:
+    _target_: torch.optim.lr_scheduler.MultiStepLR
+    _partial_: True
+    gamma: 0.5
+    milestones : 
+      - 5
+      - 11
+      - 17
+      - 23
+      - 29
+      - 33
+      - 47
+      - 50
+      - 60 
+      - 70
+      - 90
+      - 110
+      - 130
+      - 150
+      - 170
+      - 180
+      - 190
+
+no_weights: True

@@ -2,7 +2,7 @@ import itertools
 import os
 from collections import Counter
 from pathlib import Path
-from typing import Any, Literal, Sequence
+from typing import Any, Literal, Sequence, Callable
 
 import numpy as np
 import pytorch_lightning as pl
@@ -11,6 +11,7 @@ from pytorch_lightning.utilities.types import TRAIN_DATALOADERS
 from torch.utils.data import DataLoader, Dataset, random_split
 from torchvision import transforms  # type: ignore[import-untyped]
 from torchvision.io import read_image  # type: ignore[import-untyped]
+import torchvision.transforms as T
 
 import inz.data.event
 from inz.data.event import Event, Hold, Subset, Test, Tier1, Tier3
@@ -26,7 +27,11 @@ class XBDDataset(Dataset):
     """Dataset class for the xBD dataset."""
 
     def __init__(
-        self, image_paths: Sequence[Path], mask_paths: Sequence[Path], drop_unclassified_channel: bool = False
+        self,
+        image_paths: Sequence[Path],
+        mask_paths: Sequence[Path],
+        drop_unclassified_channel: bool = False,
+        transform: list[Callable[[torch.Tensor], torch.Tensor]] | None = None,
     ) -> None:
         """Init the class
 
@@ -55,11 +60,8 @@ class XBDDataset(Dataset):
         assert len(self._image_paths_pre) + len(self._image_paths_post) == len(image_paths)
         assert len(self._mask_paths_pre) + len(self._mask_paths_post) == len(mask_paths)
 
-        self.image_transform = transforms.Compose(
-            [
-                transforms.Normalize(0.5, 0.5),
-            ]
-        )
+        self.normalize = transforms.Normalize(0.5, 0.5)
+        self.transform = transform
 
     def __getitem__(self, index: int) -> tuple[tuple[torch.Tensor, torch.Tensor], tuple[torch.Tensor, torch.Tensor]]:
         image_pre = read_image(str(self._image_paths_pre[index])).to(torch.float) / 255
@@ -68,15 +70,39 @@ class XBDDataset(Dataset):
         image_post = read_image(str(self._image_paths_post[index])).to(torch.float) / 255
         mask_post_arr = np.load(self._mask_paths_post[index])["arr_0"]
         mask_post = torch.tensor(mask_post_arr, dtype=torch.float)
+
         if self.drop_unclassified_channel:
-            return (
-                self.image_transform(image_pre),
-                mask_pre[:-1, ...],
-                self.image_transform(image_post),
-                mask_post[:-1, ...],
-            )  # type: ignore[return-value]
+            mask_pre = mask_pre[:-1, ...]
+            mask_post = mask_post[:-1, ...]
+
+        stacked = torch.cat([image_pre, mask_pre, image_post, mask_post], dim=0)
+        if self.transform:
+            transformed = self.transform(stacked)
         else:
-            return self.image_transform(image_pre), mask_pre, self.image_transform(image_post), mask_post  # type: ignore[return-value]
+            transformed = stacked
+
+        return (
+            self.normalize(transformed[: image_pre.shape[0]]),
+            transformed[image_pre.shape[0] : image_pre.shape[0] + mask_pre.shape[0]],
+            self.normalize(
+                transformed[
+                    image_pre.shape[0] + mask_pre.shape[0] : image_pre.shape[0]
+                    + mask_pre.shape[0]
+                    + image_post.shape[0]
+                ]
+            ),
+            transformed[image_pre.shape[0] + mask_pre.shape[0] + image_post.shape[0] :],
+        )
+
+        # if self.drop_unclassified_channel:
+        #     return (
+        #         self.image_transform(image_pre),
+        #         mask_pre[:-1, ...],
+        #         self.image_transform(image_post),
+        #         mask_post[:-1, ...],
+        #     )  # type: ignore[return-value]
+        # else:
+        #     return self.image_transform(image_pre), mask_pre, self.image_transform(image_post), mask_post  # type: ignore[return-value]
 
     def __len__(self) -> int:
         return len(self._image_paths_pre)
@@ -86,7 +112,7 @@ class XBDDataModule(pl.LightningDataModule):
     """DataModule for the xBD dataset."""
 
     @classmethod
-    def create(cls, *args: list[Any], **kwargs: dict[str, Any]): # type: ignore[no-untyped-def]
+    def create(cls, *args: list[Any], **kwargs: dict[str, Any]):  # type: ignore[no-untyped-def]
         # Just to make hydra happy with using enums as dict keys
         if kwargs.get("events"):
             kwargs["events"] = {
@@ -95,10 +121,12 @@ class XBDDataModule(pl.LightningDataModule):
             }
 
         if kwargs.get("split_events"):
-            kwargs["split_events"] = { split_k: {  # type: ignore
+            kwargs["split_events"] = {
+                split_k: {  # type: ignore
                     getattr(inz.data.event, subset_string_k): [Event[event] for event in events_v]
                     for subset_string_k, events_v in subsets_v.items()  # type: ignore
-                } for split_k, subsets_v in kwargs["split_events"].items()
+                }
+                for split_k, subsets_v in kwargs["split_events"].items()
             }
 
         return cls(*args, **kwargs)  # type: ignore
@@ -114,6 +142,7 @@ class XBDDataModule(pl.LightningDataModule):
         val_batch_size: int | None = None,
         test_batch_size: int | None = None,
         drop_unclassified_channel: bool = False,
+        transform: list[Callable[[torch.Tensor], torch.Tensor]] | None = None,
     ) -> None:
         """
         Init the class. Supports building splitting int train / val / test by either explicit
@@ -168,6 +197,7 @@ class XBDDataModule(pl.LightningDataModule):
         super(XBDDataModule, self).__init__()
 
         self.drop_unclassified_channel = drop_unclassified_channel
+        self.transform = transform
 
         # TODO group pre and post disaster
 
@@ -233,28 +263,32 @@ class XBDDataModule(pl.LightningDataModule):
         if self._split_by_event:
             assert self._split_events
             if self._split_events.get("train"):
-                self._train_dataset = XBDDataset( # type: ignore[arg-type, misc]
+                self._train_dataset = XBDDataset(  # type: ignore[arg-type, misc]
                     *zip(*self._get_image_mask_paths(self._split_events["train"])),  # type: ignore[arg-type]
                     drop_unclassified_channel=self.drop_unclassified_channel,
+                    transform=self.transform,
                 )
             if self._split_events.get("val"):
-                self._val_dataset = XBDDataset( # type: ignore[arg-type, misc]
+                self._val_dataset = XBDDataset(  # type: ignore[arg-type, misc]
                     *zip(*self._get_image_mask_paths(self._split_events["val"])),  # type: ignore[arg-type]
                     drop_unclassified_channel=self.drop_unclassified_channel,
+                    transform=self.transform,
                 )
             if self._split_events.get("test"):
-                self._test_dataset = XBDDataset( # type: ignore[arg-type, misc]
+                self._test_dataset = XBDDataset(  # type: ignore[arg-type, misc]
                     *zip(*self._get_image_mask_paths(self._split_events["test"])),  # type: ignore[arg-type]
                     drop_unclassified_channel=self.drop_unclassified_channel,
+                    transform=self.transform,
                 )
         elif self._split_by_fraction:
             # silence mypy
             assert self._val_fraction is not None
             assert self._test_fraction is not None
 
-            all_events_dataset = XBDDataset( # type: ignore[misc]
-                *zip(*self._get_image_mask_paths(self._events)), # type: ignore[arg-type, misc]
+            all_events_dataset = XBDDataset(  # type: ignore[misc]
+                *zip(*self._get_image_mask_paths(self._events)),  # type: ignore[arg-type, misc]
                 drop_unclassified_channel=self.drop_unclassified_channel,
+                transform=self.transform,
             )
 
             assert len(self._get_image_mask_paths(self._events)) == len(set(self._get_image_mask_paths(self._events)))

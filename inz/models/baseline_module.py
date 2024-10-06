@@ -24,7 +24,7 @@ class BaselineModule(pl.LightningModule):
         n_classes = 5
         self.n_classes = n_classes
 
-        self.class_weights = class_weights if class_weights is not None else Tensor([1, 1, 1, 1, 1])
+        self.class_weights = class_weights
 
         self.save_hyperparameters(ignore=["model", "loss"])
 
@@ -58,11 +58,15 @@ class BaselineModule(pl.LightningModule):
         self, images_pre: Tensor, masks_pre: Tensor, images_post: Tensor, masks_post: Tensor
     ) -> tuple[Tensor, Tensor]:
         preds = self.forward(torch.cat([images_pre, images_post], dim=1))
-        # per-class loss in unweighted!
-        class_loss = torch.stack(
-            [self.loss_fn(preds[:, i, ...], masks_post.to(torch.float)[:, i, ...]) for i in range(preds.shape[1])]
-        )
-        loss = class_loss.dot(self.class_weights).sum()
+        if self.class_weights is not None:
+            # per-class loss in unweighted!
+            class_loss = torch.stack(
+                [self.loss_fn(preds[:, i, ...], masks_post.to(torch.float)[:, i, ...]) for i in range(preds.shape[1])]
+            )
+            loss = class_loss.dot(self.class_weights).sum()
+        else:
+            loss = self.loss_fn(preds, masks_post.to(torch.float))
+            class_loss = Tensor([0, 0, 0, 0, 0])
 
         return loss, class_loss
 

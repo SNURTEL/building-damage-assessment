@@ -14,8 +14,11 @@ from torchvision.utils import draw_segmentation_masks, make_grid  # type: ignore
 from tqdm import tqdm
 
 
+
 def get_loc_cls_weights(
-    dataloader: DataLoader, device: torch.device | None = None, drop_unclassified_class: bool = False,
+    dataloader: DataLoader,
+    device: torch.device | None = None,
+    drop_unclassified_class: bool = False,
 ) -> tuple[Ts, Ts]:
     """Iterate over a DataLoader and compute weights for localization and classification tasks.
     - Loc weights are computed as sum(cls==0)/n, sum(cls>0)/n. Shape = (2).
@@ -86,7 +89,7 @@ def show_masks_comparison(
     images_post: Ts,
     masks_pre: Ts,
     masks_post: Ts,
-    preds: Ts,
+    preds: Ts | None = None,
     colors: Iterable[tuple[int, int, int]] | None = None,
     opacity: float = 0.3,
 ) -> None:
@@ -116,22 +119,21 @@ def show_masks_comparison(
                 ],
                 nrow=1,
             ),
-            make_grid(
+        ]
+        + (
+            [make_grid(
                 [
                     draw_segmentation_masks(((i + 1) * 127.5).to(torch.uint8), m, colors=colors, alpha=opacity)
                     # todo remove argmax and moveaxis
                     for i, m in zip(images_post, F.one_hot(preds.argmax(dim=1)).to(torch.bool).moveaxis(-1, 1))
                 ],
                 nrow=1,
-            ),
-        ],
-        titles=[
-            "Source images (pre)",
-            "Ground truth (pre)",
-            "Source images (post)",
-            "Ground truth (post)",
-            "Predicted masks",
-        ],
+            )]
+            if preds
+            else []
+        ),
+        titles=["Source images (pre)", "Ground truth (pre)", "Source images (post)", "Ground truth (post)"]
+        + (["Predicted masks"] if preds else [])
     )
 
 

@@ -38,33 +38,36 @@ def main(cfg: DictConfig) -> pl.Trainer:
     dm.setup("fit")
     print(f"Loaded datamodule with {len(dm.train_dataloader())} train batches, {len(dm.val_dataloader())} val batches")
 
-    WEIGHT_CACHE_FILE = "class_weight_cache.json"
-    try:
-        with open(WEIGHT_CACHE_FILE, mode="r", encoding="utf-8") as fp:
-            weight_cache = json.load(fp)
-    except (FileNotFoundError, json.decoder.JSONDecodeError):
-        weight_cache = {}
+    if config["module"].get("no_weights") is not True:
+        WEIGHT_CACHE_FILE = "class_weight_cache.json"
+        try:
+            with open(WEIGHT_CACHE_FILE, mode="r", encoding="utf-8") as fp:
+                weight_cache = json.load(fp)
+        except (FileNotFoundError, json.decoder.JSONDecodeError):
+            weight_cache = {}
 
-    key = str(
-        nested_dict_to_tuples(
-            config["datamodule"]["datamodule"].get("events") or config["datamodule"]["datamodule"].get("split_events")
+        key = str(
+            nested_dict_to_tuples(
+                config["datamodule"]["datamodule"].get("events") or config["datamodule"]["datamodule"].get("split_events")
+            )
         )
-    )
-    print(key)
-    if hit := weight_cache.get(key):
-        print("Found matching class weights in cache")
-        loc_weights = torch.Tensor(hit["loc"]).to(device)
-        cls_weights = torch.Tensor(hit["cls"]).to(device)
+        print(key)
+        if hit := weight_cache.get(key):
+            print("Found matching class weights in cache")
+            loc_weights = torch.Tensor(hit["loc"]).to(device)
+            cls_weights = torch.Tensor(hit["cls"]).to(device)
+        else:
+            print("Class weights not found in cache")
+            loc_weights, cls_weights = get_loc_cls_weights(
+                dataloader=dm.train_dataloader(), device=device, drop_unclassified_class=True
+            )
+            weight_cache[key] = {"loc": loc_weights.tolist(), "cls": cls_weights.tolist()}
+            with open(WEIGHT_CACHE_FILE, mode="w", encoding="utf-8") as fp:
+                weight_cache = json.dump(weight_cache, fp, indent=4)
+
+        print(f"Localization weights: {loc_weights}\nClassification weights: {cls_weights}")
     else:
-        print("Class weights not found in cache")
-        loc_weights, cls_weights = get_loc_cls_weights(
-            dataloader=dm.train_dataloader(), device=device, drop_unclassified_class=True
-        )
-        weight_cache[key] = {"loc": loc_weights.tolist(), "cls": cls_weights.tolist()}
-        with open(WEIGHT_CACHE_FILE, mode="w", encoding="utf-8") as fp:
-            weight_cache = json.dump(weight_cache, fp, indent=4)
-
-    print(f"Localization weights: {loc_weights}\nClassification weights: {cls_weights}")
+        cls_weights = None
 
     if config.get("resume_from_checkpoint") in ("last", "latest", "if-exists", "if_exists"):
         try:

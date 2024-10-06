@@ -152,20 +152,18 @@ def img_path_to_labels_path(img_path: Path) -> Path:
 if __name__ == "__main__":
     DATASET_PATH = Path("data/xBD/geotiffs")
 
-    OUT_PATH = Path("data/xBD_processed")
-    OUT_MASKS_PATH = OUT_PATH / "masks"
-    OUT_IMAGES_PATH = OUT_PATH / "images"
-    OUT_JPEGS_PATH = OUT_PATH / "jpegs"
-
     IMG_SIZE = 1024
-    PATCH_SIZE = 256
 
     rglob = "*/*.tif"
     num_images = len(list(DATASET_PATH.rglob(rglob)))
 
     todos_t = Literal["images", "masks", "preview"]
 
-    def process_single_image(img_path: Path, todos: Collection[todos_t]) -> None:
+    def process_single_image(img_path: Path, patch_size: int, todos: Collection[todos_t], out_path: Path) -> None:
+        OUT_MASKS_PATH = out_path / "masks"
+        OUT_IMAGES_PATH = out_path / "images"
+        OUT_JPEGS_PATH = out_path / "jpegs"
+
         image = load_geotiff(img_path)
 
         mask_path = img_path_to_labels_path(img_path)
@@ -206,7 +204,7 @@ if __name__ == "__main__":
         )
 
         for data, out_dir, save in _todos:
-            patches = patchify(data, (PATCH_SIZE, PATCH_SIZE, data.shape[2]), PATCH_SIZE)
+            patches = patchify(data, (patch_size, patch_size, data.shape[2]), patch_size)
             n_patches_h, n_patches_w, *_ = patches.shape
 
             out_path_base = out_dir / img_path.relative_to(img_path.parents[2])
@@ -221,18 +219,20 @@ if __name__ == "__main__":
 
 
 
-    def wrapper(img_path: Path, todos: Collection[todos_t]) -> Path:
-        process_single_image(img_path, todos)
+    def wrapper(img_path: Path, patch_size: int, todos: Collection[todos_t], out_path: Path) -> Path:
+        process_single_image(img_path, patch_size, todos, out_path)
         return img_path
 
     all_todos = {"images", "masks", "preview"}
     parser = argparse.ArgumentParser()
+    parser.add_argument("patch_size", type=int, help="Size of an individual patch after split")
+    parser.add_argument("out_path", type=Path, help="Output directory")
     parser.add_argument("todos", nargs="+", choices=all_todos | {"all"})
     args = parser.parse_args()
     todos = set(args.todos) if "all" not in args.todos else all_todos
 
     with ProcessPoolExecutor() as executor:
-        tasks = [executor.submit(wrapper, img_path, todos) for img_path in DATASET_PATH.rglob(rglob)]
+        tasks = [executor.submit(wrapper, img_path, args.patch_size, todos, args.out_path) for img_path in DATASET_PATH.rglob(rglob)]
 
         try:
             for task in tqdm(as_completed(tasks), total=num_images, desc=f"Creating {', '.join(todos)}"):
