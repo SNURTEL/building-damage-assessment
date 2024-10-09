@@ -74,7 +74,7 @@ class BaselineModule(pl.LightningModule):
         loss, class_loss = self.loss(*batch)
 
         class_loss_dict = {f"train_loss_{i}": loss_val for i, loss_val in enumerate(class_loss)}
-        self.log_dict(class_loss_dict | {"train_loss": loss}, prog_bar=True)
+        self.log_dict(class_loss_dict | {"train_loss": loss}, prog_bar=True, batch_size=batch.shape[0])
         return loss  # type: ignore[no-any-return]
 
     def validation_step(self, batch: list[Tensor], batch_idx: int):  # type: ignore[no-untyped-def]
@@ -116,7 +116,7 @@ class BaselineModule(pl.LightningModule):
                 | {f"val_loss_{i}": loss_val for i, loss_val in enumerate(class_loss)}
                 | {"val_loss": loss}
             )
-            self.log_dict(log_dict, prog_bar=True)
+            self.log_dict(log_dict, prog_bar=True, batch_size=batch.shape[0])
 
             return log_dict
 

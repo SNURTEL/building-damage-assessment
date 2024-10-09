@@ -129,11 +129,11 @@ def show_masks_comparison(
                 ],
                 nrow=1,
             )]
-            if preds
+            if preds is not None
             else []
         ),
         titles=["Source images (pre)", "Ground truth (pre)", "Source images (post)", "Ground truth (post)"]
-        + (["Predicted masks"] if preds else [])
+        + (["Predicted masks"] if preds is not None else [])
     )
 
 

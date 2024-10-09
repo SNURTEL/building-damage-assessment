@@ -66,6 +66,8 @@ def main(cfg: DictConfig) -> pl.Trainer:
                 weight_cache = json.dump(weight_cache, fp, indent=4)
 
         print(f"Localization weights: {loc_weights}\nClassification weights: {cls_weights}")
+    elif config["module"].get("class_weights") is not None:
+        cls_weights = hydra.initialize(config["module"]["class_weights"])
     else:
         cls_weights = None
 

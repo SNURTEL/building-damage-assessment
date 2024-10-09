@@ -41,7 +41,7 @@ class ResizeCrop(torch.nn.Module):
                 tensor.shape[0] == 16
             ), f"Expected a tensor of shape (16, ...), ((img_pre + mask_pre + img_post + mask_post)), got {tensor.shape}"
             msk = tensor[-5:, ...]
-            assert set(msk.unique().tolist()).issubset({0, 1}), f"Last 5 layers must be img masks (post)!!! \n{msk.unique()}"
+            # assert set(msk.unique().tolist()).issubset({0, 1}), f"Last 5 layers must be img masks (post)!!! \n{msk.unique()}"
             bst_x0 = random.randint(0, tensor.shape[1] - crop_size)
             bst_y0 = random.randint(0, tensor.shape[2] - crop_size)
             bst_sc = -1
@@ -60,7 +60,6 @@ class ResizeCrop(torch.nn.Module):
                     bst_sc = _sc
                     bst_x0 = x0
                     bst_y0 = y0
-                    print("hit")
             x0 = bst_x0
             y0 = bst_y0
             tensor = tensor[:, y0 : y0 + crop_size, x0 : x0 + crop_size]

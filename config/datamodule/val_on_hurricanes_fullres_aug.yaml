@@ -1,0 +1,80 @@
+datamodule:
+  _target_: inz.data.data_module.XBDDataModule.create
+  path: '${preprocessed_data_path_fullres}'
+  drop_unclassified_channel: True
+  split_events:
+    train:
+      Tier1:
+        - guatemala_volcano
+        - mexico_earthquake
+        - midwest_flooding
+        - palu_tsunami
+        - santa_rosa_wildfire
+        - socal_fire
+      Hold:
+        - guatemala_volcano
+        - mexico_earthquake
+        - midwest_flooding
+        - palu_tsunami
+        - santa_rosa_wildfire
+        - socal_fire
+      Test:
+        - guatemala_volcano
+        - mexico_earthquake
+        - midwest_flooding
+        - palu_tsunami
+        - santa_rosa_wildfire
+        - socal_fire
+      Tier3:
+        - joplin_tornado
+        - lower_puna_volcano
+        - moore_tornado
+        - nepal_flooding
+        - pinery_bushfire
+        - portugal_wildfire
+        - sunda_tsunami
+        - tuscaloosa_tornado
+        - woolsey_fire
+    val:
+      Tier1:
+        - hurricane_florence
+        - hurricane_harvey
+        - hurricane_matthew
+        - hurricane_michael
+      Hold:
+        - hurricane_florence
+        - hurricane_harvey
+        - hurricane_matthew
+        - hurricane_michael
+      Test:
+        - hurricane_florence
+        - hurricane_harvey
+        - hurricane_matthew
+        - hurricane_michael
+  train_batch_size: 22
+  val_batch_size: 22
+  test_batch_size: 22
+  transform:
+   _target_: torchvision.transforms.Compose
+   transforms:
+    - _target_: torchvision.transforms.RandomHorizontalFlip
+      p: 0.5
+    - _target_: torchvision.transforms.RandomApply
+      p: 0.6
+      transforms:
+        - _target_: torchvision.transforms.RandomAffine
+          degrees: 
+            - -10
+            - 10 
+          scale: 
+            - 0.9
+            - 1.1
+          translate: 
+            - 0.1
+            - 0.1
+    - _target_: inz.data.transform.ResizeCrop
+      p: 0.2
+      crop_size: 608
+      resize_size: 608
+
+experiment_name: val_on_hurricanes_fullres_aug

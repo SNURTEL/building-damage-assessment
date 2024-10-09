@@ -1,3 +1,6 @@
 [submodule "inz/xview2_strong_baseline"]
 	path = inz/xview2_strong_baseline
 	url = https://github.com/PaulBorneP/Xview2_Strong_Baseline.git
+[submodule "inz/farseg"]
+	path = inz/farseg
+	url = https://github.com/Z-Zheng/FarSeg.git

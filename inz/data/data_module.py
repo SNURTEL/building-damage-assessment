@@ -18,7 +18,7 @@ from inz.data.event import Event, Hold, Subset, Test, Tier1, Tier3
 
 # Keep this number low! More workers will marginally improve performance
 # at a cost of huge ram (and swap!!!) usage.
-DATALOADER_WORKER_COUNT = 2
+DATALOADER_WORKER_COUNT = 4
 
 Split = Literal["train", "val", "test"]
 
