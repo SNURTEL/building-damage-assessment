@@ -77,4 +77,3 @@ datamodule:
       crop_size: 608
       resize_size: 608
 
-experiment_name: val_on_hurricanes_fullres_aug

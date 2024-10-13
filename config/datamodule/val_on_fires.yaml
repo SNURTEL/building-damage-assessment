@@ -56,4 +56,3 @@ datamodule:
   val_batch_size: 144
   test_batch_size: 144
 
-experiment_name: val_on_fires

@@ -4,6 +4,7 @@ import json
 import os
 import random
 import string
+import sys
 from pathlib import Path
 
 import dotenv
@@ -12,6 +13,9 @@ import pytorch_lightning as pl
 import torch
 from omegaconf import DictConfig, OmegaConf
 from pytorch_lightning.callbacks import ModelCheckpoint
+
+sys.path.append("inz/farseg")
+
 
 from inz.util import get_loc_cls_weights, get_wandb_logger, nested_dict_to_tuples
 
@@ -38,7 +42,7 @@ def main(cfg: DictConfig) -> pl.Trainer:
     dm.setup("fit")
     print(f"Loaded datamodule with {len(dm.train_dataloader())} train batches, {len(dm.val_dataloader())} val batches")
 
-    if config["module"].get("no_weights") is not True:
+    if config["module"].get("class_weights") == "auto":
         WEIGHT_CACHE_FILE = "class_weight_cache.json"
         try:
             with open(WEIGHT_CACHE_FILE, mode="r", encoding="utf-8") as fp:
@@ -67,7 +71,7 @@ def main(cfg: DictConfig) -> pl.Trainer:
 
         print(f"Localization weights: {loc_weights}\nClassification weights: {cls_weights}")
     elif config["module"].get("class_weights") is not None:
-        cls_weights = hydra.initialize(config["module"]["class_weights"])
+        cls_weights = hydra.utils.instantiate(config["module"]["class_weights"]).to(device)
     else:
         cls_weights = None
 
@@ -120,6 +124,22 @@ def main(cfg: DictConfig) -> pl.Trainer:
         watch_model_model=model,
         dir=config["wandb_dir"],
     )
+
+    wandb_logger.experiment.config["hydra_cfg"] = cfg
+    wandb_logger.experiment.config["module_class"] = cfg["module"]["module"]["_target_"]
+    wandb_logger.experiment.config["max_epochs"] = cfg["trainer"]["trainer"]["max_epochs"]
+    wandb_logger.experiment.config["class_weights"] = cfg["module"].get("class_weights")
+    wandb_logger.experiment.config["optimizer"] = cfg["module"]["module"].get("optimizer_factory")
+    wandb_logger.experiment.config["scheduler"] = cfg["module"]["module"].get("scheduler_factory")
+    wandb_logger.experiment.config["events_train"] = cfg["datamodule"]["datamodule"].get("split_events", {}).get("train")
+    wandb_logger.experiment.config["events_val"] = cfg["datamodule"]["datamodule"].get("split_events", {}).get("val")
+    wandb_logger.experiment.config["events_test"] = cfg["datamodule"]["datamodule"].get("split_events", {}).get("test")
+    wandb_logger.experiment.config["events"] = cfg["datamodule"]["datamodule"].get("events")
+    wandb_logger.experiment.config["val_fraction"] = cfg["datamodule"]["datamodule"].get("val_fraction")
+    wandb_logger.experiment.config["val_test"] = cfg["datamodule"]["datamodule"].get("val_test")
+    wandb_logger.experiment.config["train_batch_size"] = cfg["datamodule"]["datamodule"]["train_batch_size"]
+    wandb_logger.experiment.config["val_batch_size"] = cfg["datamodule"]["datamodule"]["val_batch_size"]
+    wandb_logger.experiment.config["test_batch_size"] = cfg["datamodule"]["datamodule"]["test_batch_size"]
 
     trainer = hydra.utils.instantiate(config["trainer"]["trainer"])(logger=wandb_logger)
     for callback in trainer.callbacks:

@@ -73,4 +73,3 @@ datamodule:
             - 0.1
             - 0.1
 
-experiment_name: val_on_hurricanes_aug_manual_weights
