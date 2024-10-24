@@ -39,15 +39,5 @@ module:
 
 class_weights:
   _target_: torch.Tensor
-  device:
-    _target_: torch.device
-    _args_:
-      - "cuda"
-  _args_:
-    - _target_: builtins.list
-      _args_:
-        - 0.1
-        - 1
-        - 9.04788032
-        - 8.68207691
-        - 12.9632271
+  _args_: 
+    - [0.1, 1., 9.0478803, 8.68207691, 12.9632271]

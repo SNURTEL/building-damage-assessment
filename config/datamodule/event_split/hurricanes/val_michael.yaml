@@ -1,0 +1,47 @@
+datamodule:
+  _target_: inz.data.data_module.XBDDataModule.create
+  path: '${preprocessed_data_path_512}'
+  drop_unclassified_channel: True
+  split_events:
+    train:
+      Tier1:
+        - hurricane_florence
+        - hurricane_harvey
+        - hurricane_matthew
+      Test:
+        - hurricane_florence
+        - hurricane_harvey
+        - hurricane_matthew
+      Hold:
+        - hurricane_florence
+        - hurricane_harvey
+        - hurricane_matthew
+    val:
+      Tier1:
+        - hurricane_michael
+      Test:
+        - hurricane_michael
+      Hold:
+        - hurricane_michael
+  train_batch_size: 32
+  val_batch_size: 32
+  test_batch_size: 32
+  transform:
+   _target_: torchvision.transforms.Compose
+   transforms:
+    - _target_: torchvision.transforms.RandomHorizontalFlip
+      p: 0.5
+    - _target_: torchvision.transforms.RandomApply
+      p: 0.6
+      transforms:
+        - _target_: torchvision.transforms.RandomAffine
+          degrees: 
+            - -10
+            - 10 
+          scale: 
+            - 0.9
+            - 1.1
+          translate: 
+            - 0.1
+            - 0.1
+

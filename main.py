@@ -88,8 +88,10 @@ def main(cfg: DictConfig) -> pl.Trainer:
             else:
                 print("### No checkpoint to resume from! ###")
                 exit(1)
-    else:
+    elif config.get("resume_from_checkpoint"):
         model_ckpt = config.get("resume_from_checkpoint")
+    else:
+        model_ckpt = None
 
     if model_ckpt:
         model_class_str = config["module"]["module"]["_target_"]

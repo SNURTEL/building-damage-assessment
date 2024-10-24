@@ -1,7 +1,7 @@
 class_weights:
   _target_: torch.Tensor
   _args_:
-    - [1, 1, 9.04788032 ,8.68207691, 12.9632271]
+    - [0.01, 1, 9.04788032 ,8.68207691, 12.9632271]
 
 module:
   _target_: inz.models.farseg_module.DoubleBranchFarSegModule
@@ -10,7 +10,7 @@ module:
     _target_: torch.optim.AdamW
     _partial_: True
     lr: 0.0002
-    weight_decay: 0.0001
+    weight_decay: 0.00001
   scheduler_factory:
     _target_: torch.optim.lr_scheduler.PolynomialLR
     _partial_: True

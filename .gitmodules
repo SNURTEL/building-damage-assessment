@@ -4,3 +4,6 @@
 [submodule "inz/farseg"]
 	path = inz/farseg
 	url = https://github.com/Z-Zheng/FarSeg.git
+[submodule "inz/dahitra"]
+	path = inz/dahitra
+	url = https://github.com/nka77/DAHiTra.git

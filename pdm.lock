@@ -5,7 +5,7 @@
 groups = ["default", "dev"]
 strategy = ["cross_platform", "inherit_metadata"]
 lock_version = "4.4.1"
-content_hash = "sha256:15a931400f31f95131352eba1c56c22773c21363d1b3c65383d0f9eb006d6e74"
+content_hash = "sha256:34fa96ae9e00067a40cb015be93ec530d6e891574cb008f969b347e99ba96d44"
 
 [[package]]
 name = "absl-py"
@@ -666,6 +666,17 @@ dependencies = [
 ]
 files = [
     {file = "efficientnet_pytorch-0.7.1.tar.gz", hash = "sha256:00b9b261effce59d2d47aae2ad238c29a2a65175470f41ada7ecac439b7c1ee1"},
+]
+
+[[package]]
+name = "einops"
+version = "0.8.0"
+requires_python = ">=3.8"
+summary = "A new flavour of deep learning operations"
+groups = ["default"]
+files = [
+    {file = "einops-0.8.0-py3-none-any.whl", hash = "sha256:9572fb63046264a862693b0a87088af3bdc8c068fde03de63453cbbde245465f"},
+    {file = "einops-0.8.0.tar.gz", hash = "sha256:63486517fed345712a8385c100cb279108d9d47e6ae59099b07657e983deae85"},
 ]
 
 [[package]]

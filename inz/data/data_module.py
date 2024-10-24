@@ -82,16 +82,16 @@ class XBDDataset(Dataset):
             transformed = stacked
 
         return (
-            self.normalize(transformed[: image_pre.shape[0]]),
-            transformed[image_pre.shape[0] : image_pre.shape[0] + mask_pre.shape[0]],
+            self.normalize(transformed[: image_pre.shape[0]]).float(),
+            transformed[image_pre.shape[0] : image_pre.shape[0] + mask_pre.shape[0]].long(),
             self.normalize(
                 transformed[
                     image_pre.shape[0] + mask_pre.shape[0] : image_pre.shape[0]
                     + mask_pre.shape[0]
                     + image_post.shape[0]
                 ]
-            ),
-            transformed[image_pre.shape[0] + mask_pre.shape[0] + image_post.shape[0] :],
+            ).float(),
+            transformed[image_pre.shape[0] + mask_pre.shape[0] + image_post.shape[0] :].long(),
         )
 
         # if self.drop_unclassified_channel:
