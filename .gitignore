@@ -234,3 +234,4 @@ wandb
 .ipynb_checkpoints
 outputs
 lightning_logs
+saved_checkpoints

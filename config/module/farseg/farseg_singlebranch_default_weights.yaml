@@ -1,0 +1,61 @@
+class_weights:
+  _target_: torch.Tensor
+  _args_:
+    - [0.01, 1, 9.04788032 ,8.68207691, 12.9632271]
+
+module:
+  _target_: inz.models.farseg_singlebranch_module.SingleBranchFarSegModule
+  _partial_: True
+  optimizer_factory:
+    _target_: torch.optim.AdamW
+    _partial_: True
+    lr: 0.0002
+    weight_decay: 0.00001
+  scheduler_factory:
+    _target_: torch.optim.lr_scheduler.PolynomialLR
+    _partial_: True
+    power: 0.9
+    total_iters: 60000
+  model:
+    _target_: inz.models.farseg_singlebranch_module.SingleBranchFarSeg
+    n_classes: 5
+    farseg_config: 
+      resnet_encoder:
+        resnet_type: "resnet50"
+        include_conv5: True
+        batchnorm_trainable: True
+        pretrained: True
+        freeze_at: 0
+        # 8, 16 or 32
+        output_stride: 32
+        with_cp: [False, False, False, False]
+        stem3_3x3: False
+      fpn:
+        in_channels_list: [256, 512, 1024, 2048]
+        out_channels: 256
+        conv_block: 
+          _target_: simplecv.module.fpn.default_conv_block
+          _partial_: True
+        top_blocks: None
+      scene_relation:
+        in_channels: 2048
+        channel_list: [256, 256, 256, 256]
+        out_channels: 256
+        scale_aware_proj: True
+      decoder:
+        in_channels: 256
+        out_channels: 128
+        in_feat_output_strides: [4, 8, 16, 32]
+        out_feat_output_stride: 4
+        norm_fn:
+          _target_: hydra.utils.get_class
+          path: torch.nn.BatchNorm2d
+        num_groups_gn: None
+      num_classes: 5
+      loss:
+        cls_weight: 1.0
+        ignore_index: 255
+      annealing_softmax_focalloss:
+        gamma: 2.0
+        max_step: 10000
+        annealing_type: "cosine"
