@@ -29,5 +29,6 @@ last_job_symlink_dir: outputs/${hydra:job.name}/latest_run
 last_ckpt_suffix: '-last'
 best_ckpt_suffix: '-best-f1'
 best_val_loss_ckpt_suffix: '-best-val-loss'
+best_challenge_score_ckpt_suffix: '-best-challenge-score'
 
 resume_from_checkpoint: if_exists

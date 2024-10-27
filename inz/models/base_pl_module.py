@@ -10,6 +10,8 @@ import torchmetrics.classification
 import torchmetrics.segmentation
 from torch import Tensor
 
+import gc
+
 
 class BasePLModule(pl.LightningModule, ABC):
     """Base class for segmentation PL modules."""
@@ -110,6 +112,11 @@ class BasePLModule(pl.LightningModule, ABC):
         self.log_dict(class_loss_dict | {"train_loss": loss}, prog_bar=True, batch_size=batch[0].shape[0])
         return loss  # type: ignore[no-any-return]
 
+    def on_train_epoch_start(self, *args, **kwargs):
+        # lol
+        # gc.collect()
+        return super().on_train_epoch_start(*args, **kwargs)
+
     def validation_step(self, batch: list[Tensor], batch_idx: int):  # type: ignore[no-untyped-def]
         with torch.no_grad():
             images_pre, _, images_post, masks_post = batch
@@ -203,7 +210,20 @@ class BasePLModule(pl.LightningModule, ABC):
                         batch_size=batch[0].shape[0],
                         on_epoch=True,
                     )
+
+
     def on_validation_epoch_end(self) -> None:
+        super().on_validation_epoch_start()
+        f1_per_class_safe = self.f1_per_class_safe.compute()
+        f1_class_safe = self.n_classes / sum([1 / f1_per_class_safe[i] for i in range(self.n_classes)])
+        challenge_score_safe = 0.3 * self.f1_loc_safe.compute() + 0.7 * f1_class_safe
+        self.log("f1_class_safe", f1_class_safe, prog_bar=True)
+        self.log("challenge_score_safe", challenge_score_safe, prog_bar=True)
+
+    def test_step(self, *args, **kwargs) -> Tensor:
+        return self.validation_step(*args, **kwargs)
+
+    def on_test_epoch_end(self) -> None:
         super().on_validation_epoch_start()
         f1_per_class_safe = self.f1_per_class_safe.compute()
         f1_class_safe = self.n_classes / sum([1 / f1_per_class_safe[i] for i in range(self.n_classes)])

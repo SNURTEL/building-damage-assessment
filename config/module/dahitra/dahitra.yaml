@@ -1,0 +1,56 @@
+class_weights:
+  _target_: torch.Tensor
+  _args_:
+    - [0.05, 0.2, 0.8, 0.7, 0.4]
+
+module:
+  _target_: inz.models.dahitra_module.DahitraPLModule
+  _partial_: True
+  optimizer_factory:
+    _target_: torch.optim.AdamW
+    _partial_: True
+    lr: 0.0001
+    weight_decay: 0.000001
+  scheduler_factory:
+    _target_: torch.optim.lr_scheduler.MultiStepLR
+    _partial_: True
+    gamma: 0.6
+    milestones : 
+      - 5
+      - 11
+      - 23
+      - 29
+      - 33
+      - 47
+      - 50
+      - 60 
+      - 70
+      - 90
+      - 110
+      - 130
+      - 150
+      - 170
+      - 180
+      - 190
+  model:
+    _target_: inz.models.dahitra_module.DahitraModule
+    image_size: 512
+    input_nc: 3
+    output_nc: 5
+    token_len: 4
+    resnet_stages_num: 4
+    with_pos: "learned"
+    with_decoder_pos: "learned"
+    enc_depth: 1
+    dec_depth: 8
+  loss:
+    _target_: inz.models.dahitra_module.ComboLoss
+    _args_:
+      - _target_: builtins.dict
+        dice: 1
+        focal: 8
+    per_image: False
+  class_weights:
+    _target_: torch.Tensor
+    _args_:
+      - [0.05, 0.2, 0.8, 0.7, 0.4]

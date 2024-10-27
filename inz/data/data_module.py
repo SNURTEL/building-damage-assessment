@@ -16,9 +16,12 @@ import torchvision.transforms as T
 import inz.data.event
 from inz.data.event import Event, Hold, Subset, Test, Tier1, Tier3
 
+import gc
+
+
 # Keep this number low! More workers will marginally improve performance
 # at a cost of huge ram (and swap!!!) usage.
-DATALOADER_WORKER_COUNT = 4
+DATALOADER_WORKER_COUNT = 3
 
 Split = Literal["train", "val", "test"]
 
@@ -67,9 +70,11 @@ class XBDDataset(Dataset):
         image_pre = read_image(str(self._image_paths_pre[index])).to(torch.float) / 255
         mask_pre_arr = np.load(self._mask_paths_pre[index])["arr_0"]
         mask_pre = torch.tensor(mask_pre_arr, dtype=torch.float)
+        del mask_pre_arr
         image_post = read_image(str(self._image_paths_post[index])).to(torch.float) / 255
         mask_post_arr = np.load(self._mask_paths_post[index])["arr_0"]
         mask_post = torch.tensor(mask_post_arr, dtype=torch.float)
+        del mask_post_arr
 
         if self.drop_unclassified_channel:
             mask_pre = mask_pre[:-1, ...]

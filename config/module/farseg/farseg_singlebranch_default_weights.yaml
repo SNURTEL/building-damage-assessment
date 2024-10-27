@@ -3,6 +3,7 @@ class_weights:
   _args_:
     - [0.01, 1, 9.04788032 ,8.68207691, 12.9632271]
 
+# todo test with 2x batch size
 module:
   _target_: inz.models.farseg_singlebranch_module.SingleBranchFarSegModule
   _partial_: True

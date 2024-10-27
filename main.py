@@ -15,6 +15,7 @@ from omegaconf import DictConfig, OmegaConf
 from pytorch_lightning.callbacks import ModelCheckpoint
 
 sys.path.append("inz/farseg")
+sys.path.append("inz/dahitra")
 
 
 from inz.util import get_loc_cls_weights, get_wandb_logger, nested_dict_to_tuples
