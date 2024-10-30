@@ -1,7 +1,7 @@
 class_weights:
   _target_: torch.Tensor
   _args_:
-    - [0.05, 0.2, 0.8, 0.7, 0.4]
+    - [0.01, 1, 9.04788032 ,8.68207691, 12.9632271]
 
 module:
   _target_: inz.models.dahitra_module.DahitraPLModule
