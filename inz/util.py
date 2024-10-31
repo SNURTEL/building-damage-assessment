@@ -14,7 +14,6 @@ from torchvision.utils import draw_segmentation_masks, make_grid  # type: ignore
 from tqdm import tqdm
 
 
-
 def get_loc_cls_weights(
     dataloader: DataLoader,
     device: torch.device | None = None,
@@ -62,7 +61,7 @@ def get_loc_cls_weights(
     return loc_weights, cls_weights
 
 
-def show(imgs: Ts | list[Ts], titles: str | list[str] | None = None) -> None:
+def show(imgs: Ts | list[Ts], titles: str | list[str] | None = None, title: str | None = None) -> None:
     """Display given images in a column.
 
     Args:
@@ -81,7 +80,9 @@ def show(imgs: Ts | list[Ts], titles: str | list[str] | None = None) -> None:
         axes[0, i].imshow(np.asarray(img))
         axes[0, i].set(xticklabels=[], yticklabels=[], xticks=[], yticks=[])
         if titles:
-            axes[0, i].set_title(titles_list[i])
+            axes[0, i].set_title(titles_list[i], fontsize=8)
+        if title:
+            fig.suptitle(title, fontsize=8, y=0.83)
 
 
 def show_masks_comparison(
@@ -92,6 +93,8 @@ def show_masks_comparison(
     preds: Ts | None = None,
     colors: Iterable[tuple[int, int, int]] | None = None,
     opacity: float = 0.3,
+    compact: bool = False,
+    title: str | None = None
 ) -> None:
     colors = colors or [
         (128, 128, 128),
@@ -102,38 +105,57 @@ def show_masks_comparison(
         (255, 255, 255),
     ]
     show(
-        [
-            make_grid((images_pre + 1) / 2, nrow=1),
-            make_grid(
-                [
-                    draw_segmentation_masks(((i + 1) * 127.5).to(torch.uint8), m, colors=colors, alpha=opacity)
-                    for i, m in zip(images_pre, masks_pre.to(torch.bool))
-                ],
-                nrow=1,
-            ),
-            make_grid((images_post + 1) / 2, nrow=1),
-            make_grid(
-                [
-                    draw_segmentation_masks(((i + 1) * 127.5).to(torch.uint8), m, colors=colors, alpha=opacity)
-                    for i, m in zip(images_post, masks_post.to(torch.bool))
-                ],
-                nrow=1,
-            ),
-        ]
+        (
+            [
+                make_grid((images_pre + 1) / 2, nrow=1),
+                make_grid(
+                    [
+                        draw_segmentation_masks(((i + 1) * 127.5).to(torch.uint8), m, colors=colors, alpha=opacity)
+                        for i, m in zip(images_pre, masks_pre.to(torch.bool))
+                    ],
+                    nrow=1,
+                ),
+                make_grid((images_post + 1) / 2, nrow=1),
+                make_grid(
+                    [
+                        draw_segmentation_masks(((i + 1) * 127.5).to(torch.uint8), m, colors=colors, alpha=opacity)
+                        for i, m in zip(images_post, masks_post.to(torch.bool))
+                    ],
+                    nrow=1,
+                ),
+            ]
+            if not compact
+            else [
+                make_grid(
+                    [
+                        draw_segmentation_masks(((i + 1) * 127.5).to(torch.uint8), m, colors=colors, alpha=opacity)
+                        for i, m in zip(images_post, masks_post.to(torch.bool))
+                    ],
+                    nrow=1,
+                )
+            ]
+        )
         + (
-            [make_grid(
-                [
-                    draw_segmentation_masks(((i + 1) * 127.5).to(torch.uint8), m, colors=colors, alpha=opacity)
-                    # todo remove argmax and moveaxis
-                    for i, m in zip(images_post, F.one_hot(preds.argmax(dim=1)).to(torch.bool).moveaxis(-1, 1))
-                ],
-                nrow=1,
-            )]
+            [
+                make_grid(
+                    [
+                        draw_segmentation_masks(((i + 1) * 127.5).to(torch.uint8), m, colors=colors, alpha=opacity)
+                        # todo remove argmax and moveaxis
+                        for i, m in zip(images_post, F.one_hot(preds.argmax(dim=1)).to(torch.bool).moveaxis(-1, 1))
+                    ],
+                    nrow=1,
+                )
+            ]
             if preds is not None
             else []
         ),
-        titles=["Source images (pre)", "Ground truth (pre)", "Source images (post)", "Ground truth (post)"]
-        + (["Predicted masks"] if preds is not None else [])
+        titles=(
+            ["Source images (pre)", "Ground truth (pre)", "Source images (post)", "Ground truth (post)"]
+            if not compact
+            else ["Ground truth (post)"]
+        )
+        + (["Predicted masks"] if preds is not None else []),
+        title=title
     )
 
 

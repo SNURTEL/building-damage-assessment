@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
+import io
 from typing import Any, Callable
 
+from matplotlib import pyplot as plt
 import pytorch_lightning as pl
 import torch
 import torch.nn as nn
@@ -9,8 +11,11 @@ import torchmetrics
 import torchmetrics.classification
 import torchmetrics.segmentation
 from torch import Tensor
-
+import torchvision
 import gc
+from PIL import Image
+
+import wandb
 
 
 class BasePLModule(pl.LightningModule, ABC):
@@ -75,6 +80,8 @@ class BasePLModule(pl.LightningModule, ABC):
         self.iou_per_class_safe = torchmetrics.segmentation.MeanIoU(num_classes=n_classes, per_class=True)
 
         self.f1_loc_safe = torchmetrics.classification.BinaryF1Score()
+
+        self.confusion_matrix_safe = torchmetrics.classification.MulticlassConfusionMatrix(num_classes=5, normalize='true')
 
     @abstractmethod
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -187,6 +194,7 @@ class BasePLModule(pl.LightningModule, ABC):
             self.recall_per_class_safe(cls_preds_argmax, masks_post_argmax)
             self.iou_per_class_safe(cls_preds_masks, masks_post.to(torch.uint8))
             self.f1_loc_safe((cls_preds_argmax > 0).to(torch.int), (masks_post_argmax > 0).to(torch.int))
+            self.confusion_matrix_safe(cls_preds_argmax, masks_post_argmax)
 
             log_dict_safe = {
                 "accuracy_loc_safe": self.accuracy_loc_safe,
@@ -211,9 +219,8 @@ class BasePLModule(pl.LightningModule, ABC):
                         on_epoch=True,
                     )
 
-
     def on_validation_epoch_end(self) -> None:
-        super().on_validation_epoch_start()
+        super().on_validation_epoch_end()
         f1_per_class_safe = self.f1_per_class_safe.compute()
         f1_class_safe = self.n_classes / sum([1 / f1_per_class_safe[i] for i in range(self.n_classes)])
         challenge_score_safe = 0.3 * self.f1_loc_safe.compute() + 0.7 * f1_class_safe
@@ -224,14 +231,25 @@ class BasePLModule(pl.LightningModule, ABC):
         return self.validation_step(*args, **kwargs)
 
     def on_test_epoch_end(self) -> None:
-        super().on_validation_epoch_start()
+        super().on_test_epoch_end()
         f1_per_class_safe = self.f1_per_class_safe.compute()
         f1_class_safe = self.n_classes / sum([1 / f1_per_class_safe[i] for i in range(self.n_classes)])
         challenge_score_safe = 0.3 * self.f1_loc_safe.compute() + 0.7 * f1_class_safe
         self.log("f1_class_safe", f1_class_safe, prog_bar=True)
         self.log("challenge_score_safe", challenge_score_safe, prog_bar=True)
 
+        fig, ax = plt.subplots(figsize=(10, 10))
 
+        self.confusion_matrix_safe.plot(ax=ax, labels=["Background", "No damage", "Minor damage", "Major damage", "Destroyed"], cmap="Greens")
+
+        buf = io.BytesIO()
+        fig.savefig(buf, format="png", bbox_inches="tight")
+        buf.seek(0)
+        im = torchvision.transforms.ToTensor()(Image.open(buf))
+        self.logger.log_image(
+            key="confusion_matrix",
+            images=[im],
+        )
 
     def configure_optimizers(self):  # type: ignore[no-untyped-def]
         optimizer = self.optimizer_factory(self.model.parameters())

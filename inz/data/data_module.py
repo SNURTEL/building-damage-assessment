@@ -21,7 +21,7 @@ import gc
 
 # Keep this number low! More workers will marginally improve performance
 # at a cost of huge ram (and swap!!!) usage.
-DATALOADER_WORKER_COUNT = 3
+DATALOADER_WORKER_COUNT = 2
 
 Split = Literal["train", "val", "test"]
 

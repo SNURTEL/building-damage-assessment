@@ -5,7 +5,7 @@
 groups = ["default", "dev"]
 strategy = ["cross_platform", "inherit_metadata"]
 lock_version = "4.4.1"
-content_hash = "sha256:34fa96ae9e00067a40cb015be93ec530d6e891574cb008f969b347e99ba96d44"
+content_hash = "sha256:20552625602d80096621710b5d5e41525b49525c55b521125bef4d448e3f174f"
 
 [[package]]
 name = "absl-py"
@@ -880,6 +880,27 @@ files = [
 ]
 
 [[package]]
+name = "grad-cam"
+version = "1.5.4"
+requires_python = ">=3.8"
+summary = "Many Class Activation Map methods implemented in Pytorch for classification, segmentation, object detection and more"
+groups = ["default"]
+dependencies = [
+    "Pillow",
+    "matplotlib",
+    "numpy",
+    "opencv-python",
+    "scikit-learn",
+    "torch>=1.7.1",
+    "torchvision>=0.8.2",
+    "tqdm",
+    "ttach",
+]
+files = [
+    {file = "grad-cam-1.5.4.tar.gz", hash = "sha256:920bba6ccdd758533fd1de4fd596cdceab8f0bb138b675271e95b614a1f01147"},
+]
+
+[[package]]
 name = "graphene"
 version = "3.3"
 summary = "GraphQL Framework for Python"
@@ -917,6 +938,17 @@ dependencies = [
 files = [
     {file = "graphql-relay-3.2.0.tar.gz", hash = "sha256:1ff1c51298356e481a0be009ccdff249832ce53f30559c1338f22a0e0d17250c"},
     {file = "graphql_relay-3.2.0-py3-none-any.whl", hash = "sha256:c9b22bd28b170ba1fe674c74384a8ff30a76c8e26f88ac3aa1584dd3179953e5"},
+]
+
+[[package]]
+name = "graphviz"
+version = "0.20.3"
+requires_python = ">=3.8"
+summary = "Simple Python interface for Graphviz"
+groups = ["default"]
+files = [
+    {file = "graphviz-0.20.3-py3-none-any.whl", hash = "sha256:81f848f2904515d8cd359cc611faba817598d2feaac4027b266aa3eda7b3dde5"},
+    {file = "graphviz-0.20.3.zip", hash = "sha256:09d6bc81e6a9fa392e7ba52135a9d49f1ed62526f96499325930e87ca1b5925d"},
 ]
 
 [[package]]
@@ -981,6 +1013,16 @@ groups = ["default"]
 files = [
     {file = "h11-0.14.0-py3-none-any.whl", hash = "sha256:e3fe4ac4b851c468cc8363d500db52c2ead036020723024a109d37346efaa761"},
     {file = "h11-0.14.0.tar.gz", hash = "sha256:8f19fbbe99e72420ff35c00b27a34cb9937e902a8b810e2c88300c6f0a3b699d"},
+]
+
+[[package]]
+name = "hiddenlayer"
+version = "0.3"
+summary = "Neural network graphs and training metrics for PyTorch and TensorFlow"
+groups = ["default"]
+files = [
+    {file = "hiddenlayer-0.3-py3-none-any.whl", hash = "sha256:ba5f52d773805bac3d1fb1cdbb07e8bf2126622bb4ec5add2d63670991313237"},
+    {file = "hiddenlayer-0.3.tar.gz", hash = "sha256:9197388f5512bb1a7c3ad61d7bd93c32f7bac6cbb86fb794ed3a3950282af862"},
 ]
 
 [[package]]
@@ -3652,6 +3694,17 @@ files = [
 ]
 
 [[package]]
+name = "torchview"
+version = "0.2.6"
+requires_python = ">=3.7"
+summary = "Visualization of Pytorch Models"
+groups = ["default"]
+files = [
+    {file = "torchview-0.2.6-py3-none-any.whl", hash = "sha256:e1a1fa9821b8f9dd88d59c029d6c9762c56ae1ac13b201bfbe377e138a669bfb"},
+    {file = "torchview-0.2.6.tar.gz", hash = "sha256:9db17f345321a991b756b985a6142f4d86af9f27e4235e2b1c909ce27553bfc9"},
+]
+
+[[package]]
 name = "torchvision"
 version = "0.17.2"
 requires_python = ">=3.8"
@@ -3668,6 +3721,19 @@ files = [
     {file = "torchvision-0.17.2-cp311-cp311-manylinux1_x86_64.whl", hash = "sha256:3bbc24b7713e8f22766992562547d8b4b10001208d372fe599255af84bfd1a69"},
     {file = "torchvision-0.17.2-cp311-cp311-manylinux2014_aarch64.whl", hash = "sha256:833fd2e4216ced924c8aca0525733fe727f9a1af66dfad7c5be7257e97c39678"},
     {file = "torchvision-0.17.2-cp311-cp311-win_amd64.whl", hash = "sha256:6835897df852fad1015e6a106c167c83848114cbcc7d86112384a973404e4431"},
+]
+
+[[package]]
+name = "torchviz"
+version = "0.0.2"
+summary = "A small package to create visualizations of PyTorch execution graphs"
+groups = ["default"]
+dependencies = [
+    "graphviz",
+    "torch",
+]
+files = [
+    {file = "torchviz-0.0.2.tar.gz", hash = "sha256:c790b4c993f783433604bf610cfa58bb0a031260be4ee5196a00c0884e768051"},
 ]
 
 [[package]]
@@ -3726,6 +3792,17 @@ dependencies = [
 ]
 files = [
     {file = "triton-2.2.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:da58a152bddb62cafa9a857dd2bc1f886dbf9f9c90a2b5da82157cd2b34392b0"},
+]
+
+[[package]]
+name = "ttach"
+version = "0.0.3"
+requires_python = ">=3.0.0"
+summary = "Images test time augmentation with PyTorch."
+groups = ["default"]
+files = [
+    {file = "ttach-0.0.3-py3-none-any.whl", hash = "sha256:7000bb4334f856b0c79a341df386c92f1c76faf091043cc3cd7f541d2149faf8"},
+    {file = "ttach-0.0.3.tar.gz", hash = "sha256:120c4dd881feb0e9c8dd63b154f2655891c3e20689b68a94d162bfd5557bcb48"},
 ]
 
 [[package]]

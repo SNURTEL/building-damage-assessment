@@ -33,6 +33,10 @@ dependencies = [
     "simplecv @ git+https://github.com/Z-Zheng/SimpleCV.git",
     "protobuf~=3.20",
     "einops>=0.8.0",
+    "hiddenlayer>=0.3",
+    "torchviz>=0.0.2",
+    "torchview>=0.2.6",
+    "grad-cam>=1.5.4",
 ]
 requires-python = "==3.11.*"
 readme = "README.md"
