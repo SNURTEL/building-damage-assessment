@@ -2,30 +2,24 @@ datamodule:
   _target_: inz.data.data_module.XBDDataModule.create
   path: '${preprocessed_data_path_512}'
   drop_unclassified_channel: True
-  split_events:
-    train:
-      Tier1:
-        - hurricane_harvey
-        - hurricane_matthew
-        - hurricane_michael
-      Test:
-        - hurricane_harvey
-        - hurricane_matthew
-        - hurricane_michael
-      Hold:
-        - hurricane_harvey
-        - hurricane_matthew
-        - hurricane_michael
-    val:
-      Tier1:
-        - hurricane_florence
-      Test:
-        - hurricane_florence
-      Hold:
-        - hurricane_florence
-  train_batch_size: 32
-  val_batch_size: 32
-  test_batch_size: 32
+  events:
+    Tier1:
+      - hurricane_michael
+      - hurricane_matthew
+    Hold:
+      - hurricane_michael
+      - hurricane_matthew
+    Test:
+      - hurricane_michael
+      - hurricane_matthew
+    Tier3:
+      - joplin_tornado
+      - moore_tornado
+  val_fraction: 0.15
+  test_fraction: 0.0
+  train_batch_size: 36
+  val_batch_size: 36
+  test_batch_size: 36
   transform:
    _target_: torchvision.transforms.Compose
    transforms:

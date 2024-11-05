@@ -120,7 +120,7 @@ def main(cfg: DictConfig) -> pl.Trainer:
         last_job_symlink_dir.symlink_to(output_dir)
 
     wandb_logger = get_wandb_logger(
-        run_name=f"{config['experiment_name']}-{datetime.datetime.now().replace(microsecond=0).isoformat()}-{''.join(random.choices(string.ascii_lowercase, k=8))}",
+        run_name=f"{config['experiment_name']}-{datetime.datetime.now().replace(microsecond=0).isoformat()}",
         project=config["project_name"],
         watch_model=True,
         watch_model_log_frequency=500,
@@ -144,7 +144,9 @@ def main(cfg: DictConfig) -> pl.Trainer:
     wandb_logger.experiment.config["val_batch_size"] = cfg["datamodule"]["datamodule"]["val_batch_size"]
     wandb_logger.experiment.config["test_batch_size"] = cfg["datamodule"]["datamodule"]["test_batch_size"]
 
-    trainer = hydra.utils.instantiate(config["trainer"]["trainer"])(logger=wandb_logger)
+    trainer = hydra.utils.instantiate(config["trainer"]["trainer"])(
+        logger=wandb_logger
+    )
     for callback in trainer.callbacks:
         if not isinstance(callback, ModelCheckpoint):
             continue
