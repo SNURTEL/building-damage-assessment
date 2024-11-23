@@ -7,3 +7,6 @@
 [submodule "inz/dahitra"]
 	path = inz/dahitra
 	url = https://github.com/nka77/DAHiTra.git
+[submodule "inz/revgrad"]
+	path = inz/revgrad
+	url = https://github.com/jvanvugt/pytorch-domain-adaptation.git
