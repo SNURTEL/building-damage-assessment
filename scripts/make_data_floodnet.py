@@ -2,6 +2,7 @@
 
 import argparse
 import os
+import random
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 from typing import Collection, Literal
@@ -17,12 +18,19 @@ from tqdm import tqdm  # type: ignore[import-untyped]
 
 DRY_RUN = False
 
+# Apparently, some masks in the dataset are rotated by 180 degrees not to make things too easy
+ROTATED_MASKS = [
+    7301, 7315, 7339,7370, 7423, 7450, 7577, 7581, 7583, 7584, 6708, 6710, 6711, 6712, 6713, 6714, 6715, 7240, 7267,
+    7314, 7340, 7366, 7410, 7422, 7438, 7439, 7575,7579, 7580, 7582, 7601, 7602, 6694, 6709, 7338, 7369, 7407, 7437,
+    7455, 7576, 7578
+]
+
 def _resize_crop(img: torch.Tensor, out_size: int, interpolation: InterpolationMode) -> torch.Tensor:
     img_h = img.shape[1]
     img_w = img.shape[2]
     left = (img_w - img_h) // 2
     # assuming W > H
-    return T.resized_crop(img, top=0, left=left, height=3000, width=3000, size=(out_size, out_size), interpolation=interpolation)
+    return T.resized_crop(img, top=0, left=left, height=img_h, width=img_h, size=(out_size, out_size), interpolation=interpolation)
 
 def load_img(img_path: Path | str, out_size: tuple[int, int]) -> torch.Tensor:
     img = read_image(str(img_path)).to(torch.float) / 255
@@ -74,9 +82,20 @@ if __name__ == "__main__":
 
         mask_path = img_path_to_labels_path(img_path)
 
+        mask = load_mask(mask_path, out_size)
+
+        if mask[1:3].sum() == 0 and random.random() > 0.1:
+            print(f"SKIP {img_path.stem}")
+            return
+
+
+        if int(img_path.stem) in ROTATED_MASKS:
+            print(f"ROTATE {mask_path.stem}")
+            # fix rotated masks
+            mask = T.rotate(mask, angle=180)
+
         image = load_img(img_path, out_size)
         image_uint = (image * 255).to(torch.uint8)
-        mask = load_mask(mask_path, out_size)
 
         preview = plot_mask(image, mask)
 

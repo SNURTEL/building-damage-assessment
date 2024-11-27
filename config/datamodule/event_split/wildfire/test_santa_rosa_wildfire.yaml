@@ -3,9 +3,6 @@ datamodule:
   path: '${preprocessed_data_path_512}'
   drop_unclassified_channel: True
   events:
-    Tier1:
-    Hold:
-    Test:
     Tier3:
       - portugal_wildfire
       - woolsey_fire

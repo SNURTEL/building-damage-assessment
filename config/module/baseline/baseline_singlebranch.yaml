@@ -1,5 +1,5 @@
 module:
-  _target_: inz.models.baseline_module.SingleBranchBaselinePLModule
+  _target_: inz.models.baseline_singlebranch.SingleBranchBaselinePLModule
   _partial_: True
   model:
     _target_: inz.models.baseline_singlebranch.BaselineSingleBranchModule

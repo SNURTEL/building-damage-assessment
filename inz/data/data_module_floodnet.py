@@ -21,7 +21,7 @@ import gc
 
 # Keep this number low! More workers will marginally improve performance
 # at a cost of huge ram (and swap!!!) usage.
-DATALOADER_WORKER_COUNT = 2
+DATALOADER_WORKER_COUNT = 1
 
 Split = Literal["train", "val", "test"]
 
@@ -34,6 +34,7 @@ class FloodNetDataset(Dataset):
         image_dir: Path,
         mask_dir: Path,
         transform: list[Callable[[torch.Tensor], torch.Tensor]] | None = None,
+        xbd_compat_mode: bool = True
     ) -> None:
         super(FloodNetDataset, self).__init__()
 
@@ -51,6 +52,8 @@ class FloodNetDataset(Dataset):
         self.normalize = transforms.Normalize(0.5, 0.5)
         self.transform = transform
 
+        self.xbd_compat_mode = xbd_compat_mode
+
     def __getitem__(self, index: int) -> tuple[tuple[torch.Tensor, torch.Tensor], tuple[torch.Tensor, torch.Tensor]]:
         img = read_image(str(self.image_paths[index])).to(torch.float) / 255
         mask_arr = np.load(self.mask_paths[index])["arr_0"]
@@ -62,10 +65,18 @@ class FloodNetDataset(Dataset):
         else:
             transformed = stacked
 
-        return (
-            self.normalize(transformed[: img.shape[0]]).float(),
-            transformed[mask.shape[0]:].long()
-        )
+        if self.xbd_compat_mode:
+            return (
+                torch.zeros(img.shape).float(),
+                torch.zeros(mask.shape).long(),
+                self.normalize(transformed[: img.shape[0]]).float(),
+                transformed[mask.shape[0]:].long()
+            )
+        else:
+            return (
+                self.normalize(transformed[: img.shape[0]]).float(),
+                transformed[mask.shape[0]:].long()
+            )
 
     def __len__(self) -> int:
         return len(self.image_paths)
