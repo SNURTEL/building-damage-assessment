@@ -1,0 +1,126 @@
+import argparse
+import itertools
+import os
+import re
+import shlex
+import subprocess
+import sys
+from enum import Enum
+from pathlib import Path
+from typing import NamedTuple
+
+if Path.cwd().stem == "scripts":
+    PROJECT_DIR = Path.cwd().parent
+    os.chdir("..")
+else:
+    PROJECT_DIR = Path.cwd()
+
+sys.path.append(str(PROJECT_DIR))
+
+from inz.data.event import Event
+
+EVENT_SPLIT_CONFIGS_DIR = PROJECT_DIR / "config" / "datamodule" / "event_split"
+OUTPUTS_DIR = PROJECT_DIR / "outputs"
+
+
+class ModelName(Enum):
+    baseline = "baseline"
+    farseg = "farseg"
+    dahitra = "dahitra"
+
+
+MODEL_NAMES = [mn.value for mn in ModelName]
+
+EVENT_NAMES = [e.value.replace("-", "_") for e in Event]
+
+
+class EventType(Enum):
+    wind = "wind"
+    flood = "flood"
+    wildfire = "wildfire"
+
+
+class TestConfig(NamedTuple):
+    event_type: EventType
+    test_event: Event
+    model_name: ModelName
+    datamodule_config_path: Path
+    ckpt_path: Path
+    hydra_config_dir: Path
+    val_challenge_score: float
+
+
+def get_test_configs(configs_path: Path) -> list[TestConfig]:
+    configs = []
+
+    for dm_cfg_file in configs_path.rglob("./test_*.yaml"):
+        event_name = re.search(r"test_(.*)", dm_cfg_file.stem).group(1)
+        if event_name not in EVENT_NAMES:
+            continue
+
+        event_type = dm_cfg_file.parent.stem
+        models_output_paths = [
+            (model_name, OUTPUTS_DIR / f"split_{event_type}_test_{event_name}_{model_name}")
+            for model_name in MODEL_NAMES
+        ]
+
+        for model_name, output_path in models_output_paths:
+            checkpoints_path = output_path / "latest_run" / "checkpoints"
+            hydra_config_dir = output_path / "latest_run" / ".hydra"
+            challenge_score_checkpoints = checkpoints_path.rglob("./*-challenge_score_safe-*.ckpt")
+            ckpt_paths_with_score = [
+                (float(re.search(r".*-challenge_score_safe-(0.\d+)-.*", path.stem).group(1)), path)
+                for path in challenge_score_checkpoints
+            ]
+            score, ckpt_path = max(ckpt_paths_with_score, key=lambda sp: sp[0])
+
+            configs.append(
+                TestConfig(
+                    event_type=EventType(event_type),
+                    test_event=Event(event_name.replace("_", "-")),
+                    model_name=ModelName(model_name),
+                    datamodule_config_path=dm_cfg_file.resolve(),
+                    ckpt_path=ckpt_path.resolve(),
+                    hydra_config_dir=hydra_config_dir.resolve(),
+                    val_challenge_score=score,
+                )
+            )
+
+    return configs
+
+
+def test_event(cfg: TestConfig, offline=False) -> None:
+    cmd = (
+        f"pdm run python3 test.py -d {cfg.hydra_config_dir.relative_to(PROJECT_DIR)} -c {cfg.ckpt_path} -e {cfg.test_event.value}"
+        + (" --offline" if offline else "")
+    )
+    print(f"Running cmd: {cmd}")
+    with subprocess.Popen(shlex.split(cmd)) as handle:
+        exit_code = handle.wait()
+    print()
+    if exit_code != 0:
+        raise RuntimeError(f'Command "{cmd}" exited with error code {exit_code}')
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--offline", action=argparse.BooleanOptionalAction, help="Do not log to wandb", default=False)
+    args = parser.parse_args()
+    test_configs = list(
+        itertools.chain(
+            *[get_test_configs(event_split_path) for event_split_path in EVENT_SPLIT_CONFIGS_DIR.glob("./*")]
+        )
+    )
+    n_configs = len(test_configs)
+    print(f"Got {n_configs} test configs")
+    for i, cfg in enumerate(test_configs, start=1):
+        print(
+            f"[{i} / {n_configs}] Running test with config:\n"
+            f"\tEvent type: {cfg.event_type.value}\n"
+            f"\tEvent_name: {cfg.test_event.value}\n"
+            f"\tModel: {cfg.model_name.value}\n"
+            f"\tCkpt: {cfg.ckpt_path}\n"
+            f"\tHydra: {cfg.hydra_config_dir}\n"
+            f"\tValidation score: {cfg.val_challenge_score}"
+        )
+        test_event(cfg, offline=args.offline)

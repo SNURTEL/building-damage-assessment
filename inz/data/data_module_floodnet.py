@@ -92,6 +92,7 @@ class FloodNetModule(pl.LightningDataModule):
         val_batch_size: int | None = None,
         test_batch_size: int | None = None,
         transform: list[Callable[[torch.Tensor], torch.Tensor]] | None = None,
+        num_workers: int = DATALOADER_WORKER_COUNT,
     ) -> None:
         super(FloodNetModule, self).__init__()
 
@@ -106,6 +107,8 @@ class FloodNetModule(pl.LightningDataModule):
         self._train_batch_size = train_batch_size
         self._val_batch_size = val_batch_size
         self._test_batch_size = test_batch_size
+
+        self.num_workers = num_workers
 
     def prepare_data(self) -> None:
         super().prepare_data()
@@ -122,7 +125,7 @@ class FloodNetModule(pl.LightningDataModule):
         return DataLoader(
             self._train_dataset,
             batch_size=self._train_batch_size,
-            num_workers=DATALOADER_WORKER_COUNT,
+            num_workers=self.num_workers,
             shuffle=True,
             pin_memory=True,
             persistent_workers=True,
@@ -134,7 +137,7 @@ class FloodNetModule(pl.LightningDataModule):
         return DataLoader(
             self._val_dataset,
             batch_size=self._val_batch_size,
-            num_workers=DATALOADER_WORKER_COUNT,
+            num_workers=self.num_workers,
             pin_memory=True,
             persistent_workers=True,
         )
@@ -145,7 +148,7 @@ class FloodNetModule(pl.LightningDataModule):
         return DataLoader(
             self._test_dataset,
             batch_size=self._test_batch_size,
-            num_workers=DATALOADER_WORKER_COUNT,
+            num_workers=self.num_workers,
             pin_memory=True,
             persistent_workers=True,
         )

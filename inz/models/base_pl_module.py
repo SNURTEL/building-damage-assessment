@@ -15,6 +15,7 @@ import torchvision
 import gc
 from PIL import Image
 
+import pytorch_lightning.loggers
 import wandb
 
 
@@ -128,7 +129,7 @@ class BasePLModule(pl.LightningModule, ABC):
         with torch.no_grad():
             images_pre, _, images_post, masks_post = batch
 
-            cls_preds = self.forward(torch.cat([images_pre, images_post], dim=1))
+            cls_preds = self(torch.cat([images_pre, images_post], dim=1))
             cls_preds_masks = F.one_hot(cls_preds.argmax(dim=1), num_classes=self.n_classes).moveaxis(-1, 1)
 
             cls_preds_argmax = cls_preds.argmax(dim=1)
@@ -228,6 +229,7 @@ class BasePLModule(pl.LightningModule, ABC):
         self.log("challenge_score_safe", challenge_score_safe, prog_bar=True)
 
     def test_step(self, *args, **kwargs) -> Tensor:
+        self.eval()
         return self.validation_step(*args, **kwargs)
 
     def on_test_epoch_end(self) -> None:
@@ -237,6 +239,9 @@ class BasePLModule(pl.LightningModule, ABC):
         challenge_score_safe = 0.3 * self.f1_loc_safe.compute() + 0.7 * f1_class_safe
         self.log("f1_class_safe", f1_class_safe, prog_bar=True)
         self.log("challenge_score_safe", challenge_score_safe, prog_bar=True)
+
+        if not hasattr(self.logger, "log_image"):
+            return
 
         fig, ax = plt.subplots(figsize=(10, 10))
 

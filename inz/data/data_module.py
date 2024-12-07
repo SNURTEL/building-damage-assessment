@@ -148,6 +148,7 @@ class XBDDataModule(pl.LightningDataModule):
         test_batch_size: int | None = None,
         drop_unclassified_channel: bool = False,
         transform: list[Callable[[torch.Tensor], torch.Tensor]] | None = None,
+        num_workers: int = DATALOADER_WORKER_COUNT,
     ) -> None:
         """
         Init the class. Supports building splitting int train / val / test by either explicit
@@ -257,6 +258,8 @@ class XBDDataModule(pl.LightningDataModule):
         self._val_batch_size = val_batch_size
         self._test_batch_size = test_batch_size
 
+        self.num_workers = num_workers
+
     def prepare_data(self) -> None:
         """Prepare the dataset. This function should only be called by the pytorch-lightning framework.
 
@@ -336,7 +339,7 @@ class XBDDataModule(pl.LightningDataModule):
         return DataLoader(
             self._train_dataset,
             batch_size=self._train_batch_size,
-            num_workers=DATALOADER_WORKER_COUNT,
+            num_workers=self.num_workers,
             shuffle=True,
             pin_memory=True,
             persistent_workers=True,
@@ -348,7 +351,7 @@ class XBDDataModule(pl.LightningDataModule):
         return DataLoader(
             self._val_dataset,
             batch_size=self._val_batch_size,
-            num_workers=DATALOADER_WORKER_COUNT,
+            num_workers=self.num_workers,
             pin_memory=True,
             persistent_workers=True,
         )
@@ -359,7 +362,7 @@ class XBDDataModule(pl.LightningDataModule):
         return DataLoader(
             self._test_dataset,
             batch_size=self._test_batch_size,
-            num_workers=DATALOADER_WORKER_COUNT,
+            num_workers=self.num_workers,
             pin_memory=True,
             persistent_workers=True,
         )

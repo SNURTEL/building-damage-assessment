@@ -1,5 +1,6 @@
 import importlib
 import sys
+import argparse
 from argparse import ArgumentParser
 
 import dotenv
@@ -33,6 +34,7 @@ def main() -> pl.Trainer:
     parser.add_argument(
         "-r", "--run-name", help="Run name; defaults to t_{original_run_name}", required=False, default=None
     )
+    parser.add_argument("--offline", action=argparse.BooleanOptionalAction, help="Do not log to wandb", default=False)
 
     args = parser.parse_args()
 
@@ -51,6 +53,7 @@ def main() -> pl.Trainer:
         device
     )
     model.class_weights = model.class_weights.to(device)
+    model.eval()
 
     BATCH_SIZE = cfg["datamodule"]["datamodule"]["train_batch_size"]
 
@@ -100,16 +103,19 @@ def main() -> pl.Trainer:
 
     print(f"{len(dm.test_dataloader())} test batches")
 
-    wandb_logger = get_wandb_logger(
-        run_name=f"t_{cfg['experiment_name']}",
-        project=cfg["project_name"],
-        watch_model_model=model,
-        dir="outputs/.wandb_tests",
+    if not args.offline:
+        wandb_logger = get_wandb_logger(
+            run_name=f"t_{cfg['experiment_name']}",
+            project=cfg["project_name"],
+            watch_model_model=model,
+            dir="outputs/.wandb_tests",
+        )
+        wandb_logger.experiment.config["hydra_cfg"] = cfg
+
+    trainer = pl.Trainer(
+        max_epochs=1, callbacks=[RichProgressBar()], precision="bf16-mixed",
+        logger=wandb_logger if not args.offline else None
     )
-
-    wandb_logger.experiment.config["hydra_cfg"] = cfg
-
-    trainer = pl.Trainer(max_epochs=1, callbacks=[RichProgressBar()], precision="bf16-mixed", logger=wandb_logger)
     trainer.test(model, datamodule=dm)
 
     return trainer
