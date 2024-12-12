@@ -57,7 +57,7 @@ def main() -> pl.Trainer:
     parser.add_argument("-d", "--hydra-config", help="Hydra config dumped in training process", required=True)
     parser.add_argument("-c", "--checkpoint-path", help="Checkpoint to use", required=True)
     parser.add_argument(
-        "-r", "--run-name", help="Run name; defaults to t_{original_run_name}", required=False, default=None
+        "-r", "--run-name", help="Run name; defaults to t_floodnet_{original_run_name}", required=False, default=None
     )
     parser.add_argument(
         "-n",
@@ -135,6 +135,8 @@ def main() -> pl.Trainer:
     dm.prepare_data()
     dm.setup("fit")
 
+    # ############### TEST AND ADAPT #################
+
     if not args.skip_initial:
         test_without_adaptation(model=model, datamodule=dm, cfg=cfg, offline=args.offline)
 
@@ -150,11 +152,12 @@ def test_without_adaptation(model: FloodnetMslModuleWrapper, datamodule: ZippedD
     dm.test_dataloader = dm.train_dataloader
 
     if not offline:
+        run_name = f"t_initial_floodnet_{cfg['experiment_name']}"
         wandb_logger = get_wandb_logger(
-            run_name=f"t_initial_floodnet_{cfg['experiment_name']}",
+            run_name=run_name,
             project=cfg["project_name"],
             watch_model_model=model,
-            dir="outputs/.wandb_tests",
+            dir=f"outputs/{run_name}",
         )
         wandb_logger.experiment.config["hydra_cfg"] = cfg
 
