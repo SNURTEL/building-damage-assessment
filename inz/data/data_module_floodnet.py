@@ -127,8 +127,8 @@ class FloodNetModule(pl.LightningDataModule):
             batch_size=self._train_batch_size,
             num_workers=self.num_workers,
             shuffle=True,
-            pin_memory=True,
-            persistent_workers=True,
+            pin_memory=False,
+            persistent_workers=False,
         )
 
     def val_dataloader(self) -> TRAIN_DATALOADERS:
@@ -138,8 +138,8 @@ class FloodNetModule(pl.LightningDataModule):
             self._val_dataset,
             batch_size=self._val_batch_size,
             num_workers=self.num_workers,
-            pin_memory=True,
-            persistent_workers=True,
+            pin_memory=False,
+            persistent_workers=False,
         )
 
     def test_dataloader(self) -> TRAIN_DATALOADERS:
@@ -149,6 +149,6 @@ class FloodNetModule(pl.LightningDataModule):
             self._test_dataset,
             batch_size=self._test_batch_size,
             num_workers=self.num_workers,
-            pin_memory=True,
-            persistent_workers=True,
+            pin_memory=False,
+            persistent_workers=False,
         )

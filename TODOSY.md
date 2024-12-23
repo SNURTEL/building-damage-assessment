@@ -1,0 +1,13 @@
+- [ ] 1. Splity
+    - [x] Na żywca
+    - [ ] Adaptacja
+    - [ ] Finetuning
+- [ ] 2. FloodNet
+    - [ ] Nowe modele (tylko powodzie, "ogólne" już mamy)
+    - [ ] Na żywca
+    - [ ] Adaptacja
+    - [ ] Finetuning
+- [ ] 3. Może jakaś alternatywa dla GradCAMa (bardziej XAI)
+- [ ] 4. Domain shift (FID? dopytać)
+- [ ] 5. Dopytać co właściwie ma robić :glitter system do predykcji :glitter
+    - Jakiś eksport do QGISa byłby fajny

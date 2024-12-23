@@ -32,7 +32,7 @@ class BaseMSLModuleWrapper(pl.LightningModule):
         self.n_classes_source = n_classes_source
         self.n_classes_target = n_classes_target
 
-        self.save_hyperparameters(ignore=["pl_module", "msl_los_module", "target_conf_matrix_labels"])
+        self.save_hyperparameters(ignore=["pl_module", "msl_loss_module", "target_conf_matrix_labels"])
 
         self.automatic_optimization = False
 
@@ -66,12 +66,13 @@ class BaseMSLModuleWrapper(pl.LightningModule):
 
         self.target_conf_matrix_labels = target_conf_matrix_labels
 
+        self.best_challenge_score_target = 0.
+        self.best_challenge_score_target_epoch = None
+
     @abstractmethod
     def forward_target(self, x: Tensor) -> Tensor: ...
 
     def training_step(self, batch: tuple[list[Tensor], list[Tensor]], batch_idx: int):
-        self.train()
-
         optimizer = self.optimizers()
 
         source_batch, target_batch = batch
@@ -90,10 +91,6 @@ class BaseMSLModuleWrapper(pl.LightningModule):
         optimizer.step()
         optimizer.zero_grad()
 
-        self.eval()
-        with torch.no_grad():
-            self._do_eval_step(batch)
-
     def _do_eval_step(self, batch: tuple[list[Tensor], list[Tensor]]):
         source_batch, target_batch = batch
         s_img_pre, s_mask_pre, s_img_post, s_mask_post = source_batch
@@ -103,15 +100,15 @@ class BaseMSLModuleWrapper(pl.LightningModule):
         source_preds_argmax = source_preds.argmax(dim=1)
         source_masks_post_argmax = s_mask_post.argmax(dim=1)
         self.f1_source(source_preds_argmax, source_masks_post_argmax)
-        _f1_source_class = self.f1_source_per_class(source_preds_argmax, source_masks_post_argmax)
-        _f1_loc_source = self.f1_loc_source((source_preds_argmax > 0).to(torch.int), (source_masks_post_argmax > 0).to(torch.int))
+        self.f1_source_per_class(source_preds_argmax, source_masks_post_argmax)
+        self.f1_loc_source((source_preds_argmax > 0).to(torch.int), (source_masks_post_argmax > 0).to(torch.int))
 
         target_preds = self.forward_target(torch.cat([t_img_pre, t_img_post], dim=1))
         target_preds_argmax = target_preds.argmax(dim=1)
         target_masks_post_argmax = t_mask_post.argmax(dim=1)
         self.f1_target(target_preds_argmax, target_masks_post_argmax)
-        _f1_target_class = self.f1_target_per_class(target_preds_argmax, target_masks_post_argmax)
-        _f1_loc_target = self.f1_loc_target((target_preds_argmax > 0).to(torch.int), (target_masks_post_argmax > 0).to(torch.int))
+        self.f1_target_per_class(target_preds_argmax, target_masks_post_argmax)
+        self.f1_loc_target((target_preds_argmax > 0).to(torch.int), (target_masks_post_argmax > 0).to(torch.int))
 
         self.confusion_matrix_target(target_preds_argmax, target_masks_post_argmax)
 
@@ -119,7 +116,6 @@ class BaseMSLModuleWrapper(pl.LightningModule):
             "prog_bar": True,
             "batch_size": batch[0][0].shape[0],
             "on_epoch": True,
-            "on_step": True
         }
 
         log_dict = {
@@ -141,17 +137,28 @@ class BaseMSLModuleWrapper(pl.LightningModule):
                     **common_log_kwargs
                 )
 
-        f1_source_class = self.n_classes_source / sum([1 / _f1_source_class[i] for i in range(self.n_classes_source)])
-        challenge_score_source = 0.3 * _f1_loc_source + 0.7 * f1_source_class
-        self.log("f1_source_class", f1_source_class, **common_log_kwargs)
-        self.log("challenge_score_source", challenge_score_source, **common_log_kwargs)
-
-        f1_target_class = self.n_classes_target / sum([1 / _f1_target_class[i] for i in range(self.n_classes_target)])
-        challenge_score_target = 0.3 * _f1_loc_target + 0.7 * f1_target_class
-        self.log("f1_target_class", f1_target_class, **common_log_kwargs)
-        self.log("challenge_score_target", challenge_score_target, **common_log_kwargs)
-
     def _do_on_eval_epoch_end(self):
+        f1_source_class = self.f1_source_per_class.compute()
+        f1_loc_source = self.f1_loc_source.compute()
+        f1_target_class = self.f1_target_per_class.compute()
+        f1_loc_target = self.f1_loc_source.compute()
+
+        f1_source_class = self.n_classes_source / sum([1 / f1_source_class[i] for i in range(self.n_classes_source)])
+        challenge_score_source = 0.3 * f1_loc_source + 0.7 * f1_source_class
+        self.log("f1_source_class", f1_source_class, prog_bar=True, on_epoch=True)
+        self.log("challenge_score_source", challenge_score_source, prog_bar=True, on_epoch=True)
+
+        f1_target_class = self.n_classes_target / sum([1 / f1_target_class[i] for i in range(self.n_classes_target)])
+        challenge_score_target = 0.3 * f1_loc_target + 0.7 * f1_target_class
+        self.log("f1_target_class", f1_target_class, prog_bar=True, on_epoch=True)
+        self.log("challenge_score_target", challenge_score_target, prog_bar=True, on_epoch=True)
+
+        if challenge_score_target > self.best_challenge_score_target:
+            self.best_challenge_score_target = challenge_score_target
+            self.best_challenge_score_target_epoch = self.current_epoch
+            self.log("best_challenge_score_target", challenge_score_target, prog_bar=True)
+            self.log("best_challenge_score_target_epoch", self.current_epoch, prog_bar=True)
+
         if not hasattr(self.logger, "log_image"):
             return
 
@@ -170,26 +177,21 @@ class BaseMSLModuleWrapper(pl.LightningModule):
             images=[im],
         )
 
-
     def on_train_epoch_end(self):
         scheduler = self.lr_schedulers()
         scheduler.step()
 
-        self.eval()
-        self._do_on_eval_epoch_end()
-        self.train()
-
     def test_step(self, batch: tuple[list[Tensor], list[Tensor]]):
         self._do_eval_step(batch)
 
-    def _on_test_epoch_end(self):
+    def on_test_epoch_end(self):
         self._do_on_eval_epoch_end()
 
-    # there is no validation step!
-    # because we're doing UDA, train / val /test sets are the same thing, the only difference being we do not have
-    # access to labels when training; all validation can safely be done in `training_step`
-    # def validation_step(self, batch: list[Tensor], batch_idx: int):
-    #     pass
+    def validation_step(self, batch: list[Tensor], batch_idx: int):
+        self._do_eval_step(batch)
+
+    def on_validation_epoch_end(self):
+        self._do_on_eval_epoch_end()
 
     def configure_optimizers(self):
         optimizer = self.optimizer_factory(self.inner.model.parameters())
@@ -198,6 +200,11 @@ class BaseMSLModuleWrapper(pl.LightningModule):
             return [optimizer], [scheduler]
         else:
             return optimizer
+
+
+class XBDMslModuleWrapper(BaseMSLModuleWrapper):
+    def forward_target(self, x: Tensor) -> Tensor:
+        return self.inner(x)
 
 
 class FloodnetMslModuleWrapper(BaseMSLModuleWrapper):

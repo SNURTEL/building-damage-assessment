@@ -7,7 +7,11 @@ import subprocess
 import sys
 from enum import Enum
 from pathlib import Path
-from typing import NamedTuple
+from typing import Literal, NamedTuple
+
+from rich.console import Console
+from rich.pretty import pprint
+from rich.text import Text
 
 if Path.cwd().stem == "scripts":
     PROJECT_DIR = Path.cwd().parent
@@ -38,6 +42,9 @@ class EventType(Enum):
     wind = "wind"
     flood = "flood"
     wildfire = "wildfire"
+
+
+experiment_t = Literal["noadapt", "msl", "finetune"]
 
 
 class TestConfig(NamedTuple):
@@ -74,27 +81,39 @@ def get_test_configs(configs_path: Path) -> list[TestConfig]:
             ]
             score, ckpt_path = max(ckpt_paths_with_score, key=lambda sp: sp[0])
 
-            configs.append(
-                TestConfig(
-                    event_type=EventType(event_type),
-                    test_event=Event(event_name.replace("_", "-")),
-                    model_name=ModelName(model_name),
-                    datamodule_config_path=dm_cfg_file.resolve(),
-                    ckpt_path=ckpt_path.resolve(),
-                    hydra_config_dir=hydra_config_dir.resolve(),
-                    val_challenge_score=score,
+            if model_name == "baseline" and event_name == "tuscaloosa_tornado":
+                configs.append(
+                    TestConfig(
+                        event_type=EventType(event_type),
+                        test_event=Event(event_name.replace("_", "-")),
+                        model_name=ModelName(model_name),
+                        datamodule_config_path=dm_cfg_file.resolve(),
+                        ckpt_path=ckpt_path.resolve(),
+                        hydra_config_dir=hydra_config_dir.resolve(),
+                        val_challenge_score=score,
+                    )
                 )
-            )
 
     return configs
 
 
-def test_event(cfg: TestConfig, offline=False) -> None:
-    cmd = (
-        f"pdm run python3 test.py -d {cfg.hydra_config_dir.relative_to(PROJECT_DIR)} -c {cfg.ckpt_path} -e {cfg.test_event.value}"
-        + (" --offline" if offline else "")
-    )
-    print(f"Running cmd: {cmd}")
+def test_event(cfg: TestConfig, experiment: experiment_t, offline=False) -> None:
+    if experiment == "noadapt":
+        cmd = (
+            f"pdm run python3 test.py -d {cfg.hydra_config_dir.relative_to(PROJECT_DIR)} -c {cfg.ckpt_path} -e {cfg.test_event.value}"
+            + (" --offline" if offline else "")
+        )
+    elif experiment == "msl":
+        cmd = (
+            f"pdm run python3 scripts/train_test_msl.py --skip-initial -d {'..' / cfg.hydra_config_dir.relative_to(PROJECT_DIR)} -c {cfg.ckpt_path} -e {cfg.test_event.value}"
+            + (" --offline" if offline else "")
+        )
+    elif experiment == "finetune":
+        # cmd = ""
+        raise NotImplementedError(experiment)
+    else:
+        raise ValueError(f"{experiment} is not a valid experiment")
+    pprint(f"Running cmd: {cmd}")
     with subprocess.Popen(shlex.split(cmd)) as handle:
         exit_code = handle.wait()
     print()
@@ -104,6 +123,7 @@ def test_event(cfg: TestConfig, offline=False) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument("--experiment", choices=["noadapt", "msl", "finetune"], nargs=1, help="Experiment to run", required=True)
     parser.add_argument("--offline", action=argparse.BooleanOptionalAction, help="Do not log to wandb", default=False)
     args = parser.parse_args()
     test_configs = list(
@@ -112,15 +132,23 @@ if __name__ == "__main__":
         )
     )
     n_configs = len(test_configs)
+
+    experiment = args.experiment[0]
+    console = Console()
+    text = Text.assemble((f"Running experiment {experiment.upper()}", "bold magenta"),)
+    console.print(text)
+
     print(f"Got {n_configs} test configs")
     for i, cfg in enumerate(test_configs, start=1):
-        print(
-            f"[{i} / {n_configs}] Running test with config:\n"
-            f"\tEvent type: {cfg.event_type.value}\n"
-            f"\tEvent_name: {cfg.test_event.value}\n"
-            f"\tModel: {cfg.model_name.value}\n"
-            f"\tCkpt: {cfg.ckpt_path}\n"
-            f"\tHydra: {cfg.hydra_config_dir}\n"
-            f"\tValidation score: {cfg.val_challenge_score}"
-        )
-        test_event(cfg, offline=args.offline)
+        pprint(f"[{i} / {n_configs}] Running test with config:")
+        pprint(cfg)
+        # print(
+        #     f"[{i} / {n_configs}] Running test with config:\n"
+        #     f"\tEvent type: {cfg.event_type.value}\n"
+        #     f"\tEvent_name: {cfg.test_event.value}\n"
+        #     f"\tModel: {cfg.model_name.value}\n"
+        #     f"\tCkpt: {cfg.ckpt_path}\n"
+        #     f"\tHydra: {cfg.hydra_config_dir}\n"
+        #     f"\tValidation score: {cfg.val_challenge_score}"
+        # )
+        test_event(cfg, experiment=experiment, offline=args.offline)

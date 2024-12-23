@@ -83,7 +83,7 @@ def get_model(ckpt_path: Path, cfg: dict, wrap_floodnet: bool) -> BasePLModule:
 
     if wrap_floodnet:
         model.class_weights = FLOODNET_CLASS_WEIGHTS
-    
+
     return model
 
 def get_xbd_datamodule(events: list[Event], batch_size: int, num_workers: int = 2, val_fraction: float = 0.5) -> XBDDataModule:
@@ -172,7 +172,6 @@ def main():
     args = parse_args()
     with initialize(version_base="1.3", config_path=args.hydra_config):
         cfg = compose(config_name="config", overrides=[])
-
 
     if args.floodnet:
         dm = get_floodnet_datamodule(

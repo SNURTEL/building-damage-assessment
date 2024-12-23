@@ -71,8 +71,12 @@ class ZippedDataModule(pl.LightningDataModule):
 
         # todo will not work with TensorDataset
         self._train_dataset = ZippedDataSet(self.dm1._train_dataset, self.dm2._train_dataset, match_type=self.match_type)
-        self._val_dataset = ZippedDataSet(self.dm1._val_dataset, self.dm2._val_dataset, match_type=self.match_type)
-        self._test_dataset = ZippedDataSet(self.dm1._test_dataset, self.dm2._test_dataset, match_type=self.match_type)
+        # self._val_dataset = ZippedDataSet(self.dm1._val_dataset, self.dm2._val_dataset, match_type=self.match_type)
+        # self._test_dataset = ZippedDataSet(self.dm1._test_dataset, self.dm2._test_dataset, match_type=self.match_type)
+
+        # danger! In UDA, train = val = test
+        self._val_dataset = ZippedDataSet(self.dm1._val_dataset, self.dm2._train_dataset, match_type=self.match_type)
+        self._test_dataset = ZippedDataSet(self.dm1._test_dataset, self.dm2._train_dataset, match_type=self.match_type)
 
     def setup(self, stage: str | None = None) -> None:
         self.dm1.setup(stage)
@@ -86,8 +90,8 @@ class ZippedDataModule(pl.LightningDataModule):
             batch_size=self._train_batch_size,
             num_workers=self.num_workers,
             shuffle=True,
-            pin_memory=True,
-            persistent_workers=True,
+            pin_memory=False,
+            persistent_workers=False,
         )
 
     def val_dataloader(self):
@@ -97,8 +101,8 @@ class ZippedDataModule(pl.LightningDataModule):
             self._val_dataset,
             batch_size=self._val_batch_size,
             num_workers=self.num_workers,
-            pin_memory=True,
-            persistent_workers=True,
+            pin_memory=False,
+            persistent_workers=False,
         )
 
     def test_dataloader(self):
@@ -108,6 +112,6 @@ class ZippedDataModule(pl.LightningDataModule):
             self._test_dataset,
             batch_size=self._test_batch_size,
             num_workers=self.num_workers,
-            pin_memory=True,
-            persistent_workers=True,
+            pin_memory=False,
+            persistent_workers=False,
         )

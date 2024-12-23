@@ -28,10 +28,10 @@ class BasePLModule(pl.LightningModule, ABC):
         optimizer_factory: Callable[[Any], torch.optim.Optimizer],
         scheduler_factory: Callable[[Any], torch.optim.lr_scheduler.LRScheduler] | None = None,
         class_weights: Tensor | None = None,
+        n_classes: int = 5,
     ):
         super(BasePLModule, self).__init__()
         # n classes
-        n_classes = 5
         self.n_classes = n_classes
 
         self.class_weights = class_weights
@@ -45,22 +45,22 @@ class BasePLModule(pl.LightningModule, ABC):
 
         # region DELETE THIS IF PREVIOUS METRICS WERE TRULY BROKEN
 
-        self.accuracy_loc = torchmetrics.classification.BinaryAccuracy()
-        self.iou_loc = torchmetrics.segmentation.MeanIoU(num_classes=2)
+        # self.accuracy_loc = torchmetrics.classification.BinaryAccuracy()
+        # self.iou_loc = torchmetrics.segmentation.MeanIoU(num_classes=2)
 
-        self.f1 = torchmetrics.classification.MulticlassF1Score(num_classes=n_classes)
-        self.precision = torchmetrics.classification.MulticlassPrecision(num_classes=n_classes)
-        self.recall = torchmetrics.classification.MulticlassRecall(num_classes=n_classes)
-        self.iou = torchmetrics.segmentation.MeanIoU(num_classes=n_classes)
+        # self.f1 = torchmetrics.classification.MulticlassF1Score(num_classes=n_classes)
+        # self.precision = torchmetrics.classification.MulticlassPrecision(num_classes=n_classes)
+        # self.recall = torchmetrics.classification.MulticlassRecall(num_classes=n_classes)
+        # self.iou = torchmetrics.segmentation.MeanIoU(num_classes=n_classes)
 
-        self.f1_per_class = torchmetrics.classification.MulticlassF1Score(num_classes=n_classes, average="none")
-        self.precision_per_class = torchmetrics.classification.MulticlassPrecision(
-            num_classes=n_classes, average="none"
-        )
-        self.recall_per_class = torchmetrics.classification.MulticlassRecall(num_classes=n_classes, average="none")
-        self.iou_per_class = torchmetrics.segmentation.MeanIoU(num_classes=n_classes, per_class=True)
+        # self.f1_per_class = torchmetrics.classification.MulticlassF1Score(num_classes=n_classes, average="none")
+        # self.precision_per_class = torchmetrics.classification.MulticlassPrecision(
+        #     num_classes=n_classes, average="none"
+        # )
+        # self.recall_per_class = torchmetrics.classification.MulticlassRecall(num_classes=n_classes, average="none")
+        # self.iou_per_class = torchmetrics.segmentation.MeanIoU(num_classes=n_classes, per_class=True)
 
-        self.f1_loc = torchmetrics.classification.BinaryF1Score()
+        # self.f1_loc = torchmetrics.classification.BinaryF1Score()
 
         # endregion
 
@@ -82,7 +82,7 @@ class BasePLModule(pl.LightningModule, ABC):
 
         self.f1_loc_safe = torchmetrics.classification.BinaryF1Score()
 
-        self.confusion_matrix_safe = torchmetrics.classification.MulticlassConfusionMatrix(num_classes=5, normalize='true')
+        self.confusion_matrix_safe = torchmetrics.classification.MulticlassConfusionMatrix(num_classes=n_classes, normalize='true')
 
     @abstractmethod
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -92,7 +92,7 @@ class BasePLModule(pl.LightningModule, ABC):
             x: An input tensor of shape (N, 6, H, W)
 
         Returns:
-            An output tensor of shape (N, 5, H, W)
+            An output tensor of shape (N, C, H, W)
         """
         ...
 
@@ -104,12 +104,12 @@ class BasePLModule(pl.LightningModule, ABC):
 
         Args:
             images_pre: Images pre-disaster [-1, 1], (N, 3, H, W)
-            masks_pre: Label masks pre-disaster {0, 1}, (N, 5, H, W)
+            masks_pre: Label masks pre-disaster {0, 1}, (N, C, H, W)
             images_post: Images post-disaster [-1, 1], (N, 3, H, W)
-            masks_post: Label masks post-disaster {0, 1}, (N, 5, H, W)
+            masks_post: Label masks post-disaster {0, 1}, (N, C, H, W)
 
         Returns:
-            A tuple of two elements: 1) scalar loss value 2) per-class loss tensor of shape (5)
+            A tuple of two elements: 1) scalar loss value 2) per-class loss tensor of shape (C)
         """
         ...
 
@@ -138,44 +138,44 @@ class BasePLModule(pl.LightningModule, ABC):
             loss, class_loss = self.loss(*batch)
 
             # region DELETE THIS IF PREVIOUS METRICS WERE TRULY BROKEN
-            log_dict = (
-                {
-                    "acc_loc": self.accuracy_loc(
-                        cls_preds_argmax.gt(0).to(torch.float), masks_post_argmax.gt(0).to(torch.float)
-                    ),
-                    "iou_loc": self.iou_loc(
-                        F.one_hot(cls_preds_argmax.gt(0).to(torch.long), num_classes=2).moveaxis(-1, 1),
-                        F.one_hot(masks_post_argmax.gt(0).to(torch.long), num_classes=2).moveaxis(-1, 1),
-                    ),
-                }
-                | {
-                    name: getattr(self, name)(cls_preds_argmax, masks_post_argmax)
-                    for name in ["f1", "precision", "recall"]
-                }
-                | {"iou": self.iou(cls_preds_masks, masks_post.to(torch.uint8))}
-                | {
-                    f"{name}_{i}": val
-                    for name, vec in {
-                        name: getattr(self, f"{name}_per_class")(cls_preds_argmax, masks_post_argmax)
-                        for name in ["f1", "precision", "recall"]
-                    }.items()
-                    for i, val in enumerate(vec)
-                }
-                | {
-                    f"iou_{i}": val
-                    for i, val in enumerate(self.iou_per_class(cls_preds_masks, masks_post.to(torch.uint8)))
-                }
-                | {f"val_loss_{i}": loss_val for i, loss_val in enumerate(class_loss)}
-                | {"val_loss": loss}
-            )
-            log_dict = log_dict | {
-                "f1_class": self.n_classes / sum([1 / v for k, v in log_dict.items() if k.startswith("f1_")]),
-                "f1_loc": self.f1_loc(
-                    (cls_preds_argmax > 0).to(torch.int), (masks_post_argmax > 0).to(torch.int)
-                ),
-            }
-            log_dict = log_dict | {"challenge_score": 0.3 * log_dict["f1_loc"] + 0.7 * log_dict["f1_class"]}
-            self.log_dict(log_dict, prog_bar=True, batch_size=batch[0].shape[0])
+            # log_dict = (
+            #     {
+            #         "acc_loc": self.accuracy_loc(
+            #             cls_preds_argmax.gt(0).to(torch.float), masks_post_argmax.gt(0).to(torch.float)
+            #         ),
+            #         "iou_loc": self.iou_loc(
+            #             F.one_hot(cls_preds_argmax.gt(0).to(torch.long), num_classes=2).moveaxis(-1, 1),
+            #             F.one_hot(masks_post_argmax.gt(0).to(torch.long), num_classes=2).moveaxis(-1, 1),
+            #         ),
+            #     }
+            #     | {
+            #         name: getattr(self, name)(cls_preds_argmax, masks_post_argmax)
+            #         for name in ["f1", "precision", "recall"]
+            #     }
+            #     | {"iou": self.iou(cls_preds_masks, masks_post.to(torch.uint8))}
+            #     | {
+            #         f"{name}_{i}": val
+            #         for name, vec in {
+            #             name: getattr(self, f"{name}_per_class")(cls_preds_argmax, masks_post_argmax)
+            #             for name in ["f1", "precision", "recall"]
+            #         }.items()
+            #         for i, val in enumerate(vec)
+            #     }
+            #     | {
+            #         f"iou_{i}": val
+            #         for i, val in enumerate(self.iou_per_class(cls_preds_masks, masks_post.to(torch.uint8)))
+            #     }
+            #     | {f"val_loss_{i}": loss_val for i, loss_val in enumerate(class_loss)}
+            #     | {"val_loss": loss}
+            # )
+            # log_dict = log_dict | {
+            #     "f1_class": self.n_classes / sum([1 / v for k, v in log_dict.items() if k.startswith("f1_")]),
+            #     "f1_loc": self.f1_loc(
+            #         (cls_preds_argmax > 0).to(torch.int), (masks_post_argmax > 0).to(torch.int)
+            #     ),
+            # }
+            # log_dict = log_dict | {"challenge_score": 0.3 * log_dict["f1_loc"] + 0.7 * log_dict["f1_class"]}
+            # self.log_dict(log_dict, prog_bar=True, batch_size=batch[0].shape[0])
 
             # endregion
 

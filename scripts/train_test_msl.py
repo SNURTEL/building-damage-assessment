@@ -7,6 +7,7 @@ from argparse import ArgumentParser
 from copy import deepcopy
 from functools import partial
 from pathlib import Path
+from typing import Literal
 
 import dotenv
 import hydra
@@ -23,10 +24,12 @@ else:
 
 sys.path.append(str(PROJECT_DIR))
 
+from inz.data.data_module import XBDDataModule
 from inz.data.data_module_floodnet import FloodNetModule
+from inz.data.event import Event, Hold, Tier1, Tier3, Test
 from inz.data.zipped_data_module import ZippedDataModule
 from inz.models.msl.msl_loss import IW_MaxSquareloss
-from inz.models.msl.msl_module_wrapper import FloodnetMslModuleWrapper
+from inz.models.msl.msl_module_wrapper import FloodnetMslModuleWrapper, XBDMslModuleWrapper
 from inz.util import get_wandb_logger
 
 sys.path.append("inz/farseg")
@@ -41,9 +44,65 @@ SCHED_FACTORY = partial(
     gamma=0.5,
     milestones=[5, 11, 17, 23, 29, 33, 47, 50, 60, 70, 90, 110, 130, 150, 170, 180, 190],
 )
-LOSS_FACTORY = partial(IW_MaxSquareloss, ignore_index=-1, num_class=3, ratio=0.2)
+LOSS_FACTORY = partial(IW_MaxSquareloss, ignore_index=-1)
+MSL_LAMBDA = 0.2
 
 #############################################################################################
+
+
+DATASET: Literal["FloodNet", "xBD"] | None = None
+
+
+def get_xbd_datamodule(events: list[Event], batch_size: int, num_workers: int = 2, val_fraction: float = 0.5) -> XBDDataModule:
+    events_config = {
+        Tier1: [],
+        Tier3: [],
+        Test: [],
+        Hold: []
+    }
+    for event in events:
+        for split in (Tier1, Tier3, Test, Hold):
+            if event in split.events:
+                events_config[split].append(event)
+    dm = XBDDataModule(
+        path=PROJECT_DIR / "data/xBD_processed_512",
+        drop_unclassified_channel=True,
+        events=events_config,
+        train_batch_size=batch_size,
+        val_batch_size=batch_size,
+        test_batch_size=batch_size,
+        val_fraction=val_fraction,
+        test_fraction=0.,
+        num_workers=num_workers,
+        transform=T.Compose(
+            transforms=[
+                T.RandomHorizontalFlip(p=0.5),
+                T.RandomApply(
+                    p=0.6, transforms=[T.RandomAffine(degrees=(-10, 10), scale=(0.9, 1.1), translate=(0.1, 0.1))]
+                ),
+            ]
+        ),
+    )
+    return dm
+
+
+def get_floodnet_datamodule(batch_size: int, num_workers: int = 2) -> FloodNetModule:
+    dm = FloodNetModule(
+            path=Path(PROJECT_DIR / "data/floodnet_processed_512/FloodNet-Supervised_v1.0"),
+            train_batch_size=batch_size,
+            val_batch_size=batch_size,
+            test_batch_size=batch_size,
+            transform=T.Compose(
+                transforms=[
+                    T.RandomHorizontalFlip(p=0.5),
+                    T.RandomApply(
+                        p=0.6, transforms=[T.RandomAffine(degrees=(-10, 10), scale=(0.9, 1.1), translate=(0.1, 0.1))]
+                    ),
+                ]
+            ),
+            num_workers=num_workers
+        )
+    return dm
 
 
 def main() -> pl.Trainer:
@@ -56,6 +115,8 @@ def main() -> pl.Trainer:
     parser = ArgumentParser()
     parser.add_argument("-d", "--hydra-config", help="Hydra config dumped in training process", required=True)
     parser.add_argument("-c", "--checkpoint-path", help="Checkpoint to use", required=True)
+    parser.add_argument("-f", "--floodnet", help="Use FloodNet dataset. Specifying either -f or -e is required.", action=argparse.BooleanOptionalAction)
+    parser.add_argument("-e", "--events", help="Events to test on; comma-separated list of events, Specifying either -f or -e is required.", default=None)
     parser.add_argument(
         "-r", "--run-name", help="Run name; defaults to t_floodnet_{original_run_name}", required=False, default=None
     )
@@ -77,6 +138,11 @@ def main() -> pl.Trainer:
 
     args = parser.parse_args()
 
+    assert bool(args.events) != bool(args.floodnet), "Provide either --events or --floodnet"
+
+    global DATASET
+    DATASET = "FloodNet" if args.floodnet else "xBD"
+
     with initialize(version_base="1.3", config_path=args.hydra_config):
         cfg = compose(config_name="config", overrides=[])
 
@@ -93,43 +159,50 @@ def main() -> pl.Trainer:
         device
     )
 
-    model = FloodnetMslModuleWrapper(
-        pl_module=_model,
-        n_classes_target=3,
-        msl_loss_module=LOSS_FACTORY().to(device),
-        msl_lambda=0.2,
-        optimizer_factory=OPTIM_FACTORY,
-        scheduler_factory=SCHED_FACTORY,
-        target_conf_matrix_labels=("Background", "Non-flooded", "Flooded"),
-    ).to(device)
+    if DATASET == "FloodNet":
+        model = FloodnetMslModuleWrapper(
+            pl_module=_model,
+            n_classes_target=3,
+            msl_loss_module=LOSS_FACTORY(num_class=3).to(device),
+            msl_lambda=MSL_LAMBDA,
+            optimizer_factory=OPTIM_FACTORY,
+            scheduler_factory=SCHED_FACTORY,
+            target_conf_matrix_labels=("Background", "Non-flooded", "Flooded"),
+        ).to(device)
+    else:
+        model = XBDMslModuleWrapper(
+            pl_module=_model,
+            n_classes_target=5,
+            msl_loss_module=LOSS_FACTORY(num_class=5).to(device),
+            msl_lambda=MSL_LAMBDA,
+            optimizer_factory=OPTIM_FACTORY,
+            scheduler_factory=SCHED_FACTORY,
+            target_conf_matrix_labels=["Background", "No damage", "Minor damage", "Major damage", "Destroyed"],
+        ).to(device)
 
     # ############### SETUP DATAMODULE #################
 
-    BATCH_SIZE = cfg["datamodule"]["datamodule"]["train_batch_size"] // 2
+    BATCH_SIZE = int(cfg["datamodule"]["datamodule"]["train_batch_size"] * 0.9 // 2)
 
     _dm_source = hydra.utils.instantiate(cfg["datamodule"]["datamodule"])
-    _dm_target = FloodNetModule(
-        path=Path(PROJECT_DIR / "data/floodnet_processed_512/FloodNet-Supervised_v1.0"),
-        train_batch_size=BATCH_SIZE,
-        val_batch_size=BATCH_SIZE,
-        test_batch_size=BATCH_SIZE,
-        transform=T.Compose(
-            transforms=[
-                T.RandomHorizontalFlip(p=0.5),
-                T.RandomApply(
-                    p=0.6, transforms=[T.RandomAffine(degrees=(-10, 10), scale=(0.9, 1.1), translate=(0.1, 0.1))]
-                ),
-            ]
-        ),
-    )
+
+    if DATASET == "FloodNet":
+        _dm_target = get_floodnet_datamodule(batch_size=BATCH_SIZE)
+    else:
+        events = {Event(event_name) for event_name in args.events.replace("_", "-").split(",")}
+        _dm_target = get_xbd_datamodule(
+            events=events,
+            batch_size=cfg["datamodule"]["datamodule"]["train_batch_size"],
+            val_fraction=0.
+        )
 
     dm = ZippedDataModule(
         dm1=_dm_source,
         dm2=_dm_target,
         match_type="max",
-        num_workers=8,
-        train_batch_size=BATCH_SIZE,
-        val_batch_size=BATCH_SIZE,
+        num_workers=8 if args.floodnet else 2,
+        train_batch_size=2 * BATCH_SIZE,
+        val_batch_size=2 * BATCH_SIZE,
         test_batch_size=BATCH_SIZE,
     )
     dm.prepare_data()
@@ -138,21 +211,21 @@ def main() -> pl.Trainer:
     # ############### TEST AND ADAPT #################
 
     if not args.skip_initial:
-        test_without_adaptation(model=model, datamodule=dm, cfg=cfg, offline=args.offline)
+        test_without_adaptation(model=model, datamodule=dm, cfg=cfg, offline=args.offline, run_name=args.run_name)
 
-    train_adapt(model=model, datamodule=dm, n_epochs=args.num_epochs, cfg=cfg, offline=args.offline)
+    train_adapt(model=model, datamodule=dm, n_epochs=args.num_epochs, cfg=cfg, offline=args.offline, run_name=args.run_name)
 
     return
 
 
-def test_without_adaptation(model: FloodnetMslModuleWrapper, datamodule: ZippedDataModule, cfg: dict, offline: bool):
+def test_without_adaptation(model: FloodnetMslModuleWrapper | XBDMslModuleWrapper, datamodule: ZippedDataModule, cfg: dict, offline: bool, run_name: str | None = None):
     dm = deepcopy(datamodule)
     dm.prepare_data()
     dm.setup("test")
-    dm.test_dataloader = dm.train_dataloader
+    dm.test_dataloader = dm.val_dataloader
 
     if not offline:
-        run_name = f"t_initial_floodnet_{cfg['experiment_name']}"
+        run_name = run_name or f"t_initial_{'floodnet' if DATASET == 'FloodNet' else 'xbd'}_{cfg['experiment_name']}"
         wandb_logger = get_wandb_logger(
             run_name=run_name,
             project=cfg["project_name"],
@@ -169,13 +242,14 @@ def test_without_adaptation(model: FloodnetMslModuleWrapper, datamodule: ZippedD
         sync_batchnorm=True,
         callbacks=[pl.callbacks.RichProgressBar()],
         logger=wandb_logger if not offline else None,
+        log_every_n_steps=10
     )
 
     trainer.test(model=model, datamodule=dm)
 
 
-def train_adapt(model: FloodnetMslModuleWrapper, datamodule: ZippedDataModule, cfg: dict, offline: bool, n_epochs: int):
-    experiment_name = f"t_floodnet_{cfg['experiment_name']}"
+def train_adapt(model: FloodnetMslModuleWrapper, datamodule: ZippedDataModule, cfg: dict, offline: bool, n_epochs: int, run_name: str | None = None):
+    experiment_name = run_name or f"t_{'floodnet' if DATASET == 'FloodNet' else 'xbd'}_msl_{cfg['experiment_name']}"
 
     if not offline:
         wandb_logger = get_wandb_logger(
@@ -207,11 +281,12 @@ def train_adapt(model: FloodnetMslModuleWrapper, datamodule: ZippedDataModule, c
                 monitor="challenge_score_target",
                 mode="max",
                 filename=experiment_name
-                + "-{epoch:02d}-{step:03d}-{challenge_score_target:.4f}-best-challenge-floodnet",
+                + "-{epoch:02d}-{step:03d}-{challenge_score_target:.4f}-best-challenge-" + f"{'floodnet' if DATASET == 'FloodNet' else 'xbd'}",
                 save_last=False,
             ),
         ],
         logger=wandb_logger if not offline else None,
+        log_every_n_steps=10
     )
 
     trainer.fit(model=model, datamodule=datamodule)

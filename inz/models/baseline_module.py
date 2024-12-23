@@ -15,12 +15,14 @@ class BaselineModule(BasePLModule):
         optimizer_factory: Callable[[Any], torch.optim.Optimizer],
         scheduler_factory: Callable[[Any], torch.optim.lr_scheduler.LRScheduler] | None = None,
         class_weights: Tensor | None = None,
+        n_classes: int = 5,
     ):
         super(BaselineModule, self).__init__(
             model=model,
             optimizer_factory=optimizer_factory,
             scheduler_factory=scheduler_factory,
             class_weights=class_weights,
+            n_classes=n_classes
         )
 
         self.loss_fn = loss
