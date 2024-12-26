@@ -15,6 +15,7 @@ import torch
 import torchvision.transforms as T
 from hydra import compose, initialize
 
+
 if Path.cwd().stem == "scripts":
     PROJECT_DIR = Path.cwd().parent
     os.chdir("..")
@@ -27,6 +28,7 @@ from inz.data.data_module import XBDDataModule
 from inz.data.data_module_floodnet import FloodNetModule
 from inz.data.event import Event, Hold, Tier1, Tier3, Test
 from inz.models.base_pl_module import BasePLModule
+from inz.models.farseg_singlebranch_module import SingleBranchFarSegModule
 from inz.util import get_wandb_logger
 
 sys.path.append("inz/farseg")
@@ -50,20 +52,20 @@ FLOODNET_CLASS_WEIGHTS = torch.Tensor([0.01, 0.5, 1.]).to(device)
 
 #############################################################################################
 
-def _floodnet_module_adapter(model_class: Type) -> Type:
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        preds = self.model(x)
-        return torch.cat([preds[:, :2, ...], preds[:, 2:, ...].max(dim=1, keepdim=True).values], dim=1)
+# def _floodnet_module_adapter(model_class: Type) -> Type:
+#     def forward(self, x: torch.Tensor) -> torch.Tensor:
+#         preds = self.model(x)
+#         return torch.cat([preds[:, :2, ...], preds[:, 2:, ...].max(dim=1, keepdim=True).values], dim=1)
 
-    class_init = model_class.__init__
+#     class_init = model_class.__init__
 
-    # This is not how this works. This is not how any of this works.
-    base_class = model_class.__bases__[0]
-    # base_class = [c for c in model_class.__mro__ if c is BasePLModule][0]
+#     # This is not how this works. This is not how any of this works.
+#     base_class = model_class.__bases__[0]
+#     # base_class = [c for c in model_class.__mro__ if c is BasePLModule][0]
 
-    model_class.__init__ = partialmethod(class_init, n_classes=3)
-    base_class.forward = forward
-    return model_class
+#     model_class.__init__ = partialmethod(class_init, n_classes=3)
+#     base_class.forward = forward
+#     return model_class
 
 def get_model(ckpt_path: Path, cfg: dict, wrap_floodnet: bool) -> BasePLModule:
     model_class_str = cfg["module"]["module"]["_target_"]
@@ -72,16 +74,22 @@ def get_model(ckpt_path: Path, cfg: dict, wrap_floodnet: bool) -> BasePLModule:
     imported_module = importlib.import_module(module_path)
     model_class = getattr(imported_module, model_class_name)
 
-    if wrap_floodnet:
-        model_class = _floodnet_module_adapter(model_class)
+    # if wrap_floodnet:
+    #     model_class = _floodnet_module_adapter(model_class)
 
     model_partial = hydra.utils.instantiate(cfg["module"]["module"])
 
-    model = model_class.load_from_checkpoint(ckpt_path, *model_partial.args, **model_partial.keywords).to(device)
+    model = model_class.load_from_checkpoint(ckpt_path, *model_partial.args, **(model_partial.keywords | ({'n_classes': 3} if wrap_floodnet else {}))).to(device)
     model.optimizer_factory = OPTIM_FACTORY
     model.scheduler_factory = SCHED_FACTORY
 
     if wrap_floodnet:
+        model_forward_fn = model.__class__.forward
+        def forward_wrapper(x: torch.Tensor) -> torch.Tensor:
+            preds = model_forward_fn(model, x)
+            return torch.cat([preds[:, :2, ...], preds[:, 2:, ...].max(dim=1, keepdim=True).values], dim=1)
+        model.forward = forward_wrapper
+
         model.class_weights = FLOODNET_CLASS_WEIGHTS
 
     return model

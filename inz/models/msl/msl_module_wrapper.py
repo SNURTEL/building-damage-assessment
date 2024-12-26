@@ -84,7 +84,7 @@ class BaseMSLModuleWrapper(pl.LightningModule):
         target_preds = self.forward_target(torch.cat([t_img_pre, t_img_post], dim=1))
         target_preds_P = F.softmax(target_preds, dim=1)
         target_preds_labels = target_preds_P
-        loss_target = self.msl_loss(target_preds, target_preds_labels)
+        loss_target = self.msl_lambda * self.msl_loss(target_preds, target_preds_labels)
         self.manual_backward(loss_target)
         self.log("train_target_loss", loss_target, prog_bar=True, batch_size=batch[0][0].shape[0])
 
@@ -153,7 +153,7 @@ class BaseMSLModuleWrapper(pl.LightningModule):
         self.log("f1_target_class", f1_target_class, prog_bar=True, on_epoch=True)
         self.log("challenge_score_target", challenge_score_target, prog_bar=True, on_epoch=True)
 
-        if challenge_score_target > self.best_challenge_score_target:
+        if challenge_score_target >= self.best_challenge_score_target:
             self.best_challenge_score_target = challenge_score_target
             self.best_challenge_score_target_epoch = self.current_epoch
             self.log("best_challenge_score_target", challenge_score_target, prog_bar=True)

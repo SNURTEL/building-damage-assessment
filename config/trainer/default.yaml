@@ -14,13 +14,13 @@ trainer:
       monitor: epoch
       mode: max
       filename: '{experiment_name}-{epoch:02d}-{step:03d}-{f1:.6f}${last_ckpt_suffix}'
-    - _target_: pytorch_lightning.callbacks.ModelCheckpoint
-      dirpath: ${hydra:run.dir}/checkpoints
-      save_top_k: 2
-      monitor: f1
-      mode: max
-      filename: '{experiment_name}-{epoch:02d}-{step:03d}-{f1:.6f}${best_ckpt_suffix}'
-      save_last: False
+    # - _target_: pytorch_lightning.callbacks.ModelCheckpoint
+    #   dirpath: ${hydra:run.dir}/checkpoints
+    #   save_top_k: 2
+    #   monitor: f1_safe
+    #   mode: max
+    #   filename: '{experiment_name}-{epoch:02d}-{step:03d}-{f1:.6f}${best_ckpt_suffix}'
+    #   save_last: False
     - _target_: pytorch_lightning.callbacks.ModelCheckpoint
       dirpath: ${hydra:run.dir}/checkpoints
       save_top_k: 2

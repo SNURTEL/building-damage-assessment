@@ -21,6 +21,7 @@ class SingleBranchFarSegModule(BasePLModule):
         model: nn.Module,
         optimizer_factory: Callable[[Any], torch.optim.Optimizer],
         scheduler_factory: Callable[[Any], torch.optim.lr_scheduler.LRScheduler] | None = None,
+        n_classes: int = 5,
         class_weights: Tensor | None = None,
     ):
         super(SingleBranchFarSegModule, self).__init__(
@@ -28,6 +29,7 @@ class SingleBranchFarSegModule(BasePLModule):
             optimizer_factory=optimizer_factory,
             scheduler_factory=scheduler_factory,
             class_weights=class_weights,
+            n_classes=n_classes,
         )
 
     def forward(self, x: Tensor) -> Tensor:
@@ -42,7 +44,7 @@ class SingleBranchFarSegModule(BasePLModule):
         loss = self.model.module.config.loss.cls_weight * self.model.module.cls_loss(
             preds, torch.argmax(masks_post, dim=1)
         )
-        class_loss = Tensor([0, 0, 0, 0, 0])
+        class_loss = torch.zeros((self.n_classes,))
 
         return loss, class_loss
 
