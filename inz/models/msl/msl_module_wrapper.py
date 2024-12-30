@@ -207,7 +207,7 @@ class XBDMslModuleWrapper(BaseMSLModuleWrapper):
         return self.inner(x)
 
 
-class FloodnetMslModuleWrapper(BaseMSLModuleWrapper):
+class FRNetMslModuleWrapper(BaseMSLModuleWrapper):
     def forward_target(self, x: Tensor) -> Tensor:
         preds = self.inner(x)
         return torch.cat([preds[:, :2, ...], preds[:, 2:, ...].max(dim=1, keepdim=True).values], dim=1)

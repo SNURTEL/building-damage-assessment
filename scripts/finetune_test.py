@@ -25,7 +25,7 @@ else:
 sys.path.append(str(PROJECT_DIR))
 
 from inz.data.data_module import XBDDataModule
-from inz.data.data_module_floodnet import FloodNetModule
+from inz.data.data_module_frnet import FRNetModule
 from inz.data.event import Event, Hold, Tier1, Tier3, Test
 from inz.models.base_pl_module import BasePLModule
 from inz.models.farseg_singlebranch_module import SingleBranchFarSegModule
@@ -126,8 +126,8 @@ def get_xbd_datamodule(events: list[Event], batch_size: int, num_workers: int = 
     )
     return dm
 
-def get_floodnet_datamodule(batch_size: int, num_workers: int = 2) -> FloodNetModule:
-    dm = FloodNetModule(
+def get_floodnet_datamodule(batch_size: int, num_workers: int = 2) -> FRNetModule:
+    dm = FRNetModule(
         path=Path(PROJECT_DIR / "data/floodnet_processed_512/FloodNet-Supervised_v1.0"),
         train_batch_size=batch_size,
         val_batch_size=batch_size,

@@ -66,7 +66,7 @@ def remap_mask_rescuenet(mask: torch.Tensor):
         # 'Riad-Blocked':8,
         # 'Tree':9
         # 'Pool': 10).
-    # Output mask has 5 channels 
+    # Output mask has 5 channels
     #    - 0. background (not building)
     #    - 1. building not damaged
     #    - 2. building minor damage
@@ -114,7 +114,7 @@ if __name__ == "__main__":
             (255, 174, 0),
             (255, 0, 0),
         ]
-    
+
 
     def process_single_image(img_path: Path, out_size: int, todos: Collection[todos_t], out_path: Path) -> None:
         out_path_img = out_path / img_path.relative_to(img_path.parents[3])
@@ -200,7 +200,7 @@ if __name__ == "__main__":
     DRY_RUN = args.dry_run
     if DRY_RUN:
         print("### DRY RUN! ###")
-    
+
     DATASET = args.dataset[0]
     print(f"DATASET: {DATASET}")
 

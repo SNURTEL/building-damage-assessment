@@ -13,6 +13,7 @@ raw_data_path: data/xBD
 preprocessed_data_path: data/xBD_processed
 preprocessed_data_path_fullres: data/xBD_processed_noresize
 preprocessed_data_path_512: data/xBD_processed_512
+rescuenet_preprocessed_data_path_512: data/rescuenet_processed_512/RescueNet
 
 experiment_name: ???
 

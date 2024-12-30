@@ -26,8 +26,8 @@ DATALOADER_WORKER_COUNT = 1
 Split = Literal["train", "val", "test"]
 
 
-class FloodNetDataset(Dataset):
-    """Dataset class for the FloodNet dataset."""
+class FRNetDataset(Dataset):
+    """Dataset class for FloodNet and RescueNet datasets."""
 
     def __init__(
         self,
@@ -36,7 +36,7 @@ class FloodNetDataset(Dataset):
         transform: list[Callable[[torch.Tensor], torch.Tensor]] | None = None,
         xbd_compat_mode: bool = True
     ) -> None:
-        super(FloodNetDataset, self).__init__()
+        super(FRNetDataset, self).__init__()
 
         self.image_dir = image_dir
         self.mask_dir = mask_dir
@@ -70,20 +70,20 @@ class FloodNetDataset(Dataset):
                 torch.zeros(img.shape).float(),
                 torch.zeros(mask.shape).long(),
                 self.normalize(transformed[: img.shape[0]]).float(),
-                transformed[mask.shape[0]:].long()
+                transformed[img.shape[0]:].long()
             )
         else:
             return (
                 self.normalize(transformed[: img.shape[0]]).float(),
-                transformed[mask.shape[0]:].long()
+                transformed[img.shape[0]:].long()
             )
 
     def __len__(self) -> int:
         return len(self.image_paths)
 
 
-class FloodNetModule(pl.LightningDataModule):
-    """DataModule for the FloodNet dataset."""
+class FRNetModule(pl.LightningDataModule):
+    """DataModule for FloodNet and RescueNet datasets."""
 
     def __init__(
         self,
@@ -94,7 +94,7 @@ class FloodNetModule(pl.LightningDataModule):
         transform: list[Callable[[torch.Tensor], torch.Tensor]] | None = None,
         num_workers: int = DATALOADER_WORKER_COUNT,
     ) -> None:
-        super(FloodNetModule, self).__init__()
+        super(FRNetModule, self).__init__()
 
         self.transform = transform
 
@@ -114,7 +114,7 @@ class FloodNetModule(pl.LightningDataModule):
         super().prepare_data()
 
         for subset in ("train", "val", "test"):
-            setattr(self, f"_{subset}_dataset", FloodNetDataset(
+            setattr(self, f"_{subset}_dataset", FRNetDataset(
                 image_dir=self._path / subset / f"{subset}-org-img",
                 mask_dir=self._path / subset / f"{subset}-label-img",
             ))

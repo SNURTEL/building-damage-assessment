@@ -26,11 +26,11 @@ else:
 sys.path.append(str(PROJECT_DIR))
 
 from inz.data.data_module import XBDDataModule
-from inz.data.data_module_floodnet import FloodNetModule
+from inz.data.data_module_frnet import FRNetModule
 from inz.data.event import Event, Hold, Tier1, Tier3, Test
 from inz.data.zipped_data_module import ZippedDataModule
 from inz.models.msl.msl_loss import IW_MaxSquareloss
-from inz.models.msl.msl_module_wrapper import FloodnetMslModuleWrapper, XBDMslModuleWrapper
+from inz.models.msl.msl_module_wrapper import FRNetMslModuleWrapper, XBDMslModuleWrapper
 from inz.util import get_wandb_logger
 
 sys.path.append("inz/farseg")
@@ -99,18 +99,18 @@ def get_xbd_datamodule(events: list[Event], batch_size: int, num_workers: int = 
     return dm
 
 
-def get_floodnet_datamodule(batch_size: int, num_workers: int = 2) -> FloodNetModule:
+def get_floodnet_datamodule(batch_size: int, num_workers: int = 2) -> FRNetModule:
     path = Path(PROJECT_DIR / "data/floodnet_processed_512/FloodNet-Supervised_v1.0")
     return _get_floodnet_rescuenet_datamodule(path=path, batch_size=batch_size, num_workers=num_workers)
 
 
-def get_rescuenet_datamodule(batch_size: int, num_workers: int = 2) -> FloodNetModule:
+def get_rescuenet_datamodule(batch_size: int, num_workers: int = 2) -> FRNetModule:
     path = Path(PROJECT_DIR / "data/rescuenet_processed_512/RescueNet")
     return _get_floodnet_rescuenet_datamodule(path=path, batch_size=batch_size, num_workers=num_workers)
 
 
-def _get_floodnet_rescuenet_datamodule(path: Path, batch_size: int, num_workers: int) -> FloodNetModule:
-    dm = FloodNetModule(
+def _get_floodnet_rescuenet_datamodule(path: Path, batch_size: int, num_workers: int) -> FRNetModule:
+    dm = FRNetModule(
             path=path,
             train_batch_size=batch_size,
             val_batch_size=batch_size,
@@ -192,7 +192,7 @@ def main() -> pl.Trainer:
     _model.class_weights = _model.class_weights.to(device)
 
     if DATASET == "floodnet":
-        model = FloodnetMslModuleWrapper(
+        model = FRNetMslModuleWrapper(
             pl_module=_model,
             n_classes_target=3,
             msl_loss_module=LOSS_FACTORY(num_class=3).to(device),
@@ -252,7 +252,7 @@ def main() -> pl.Trainer:
     return
 
 
-def test_without_adaptation(model: FloodnetMslModuleWrapper | XBDMslModuleWrapper, datamodule: ZippedDataModule, cfg: dict, offline: bool, run_name: str | None = None):
+def test_without_adaptation(model: FRNetMslModuleWrapper | XBDMslModuleWrapper, datamodule: ZippedDataModule, cfg: dict, offline: bool, run_name: str | None = None):
     dm = deepcopy(datamodule)
     dm.prepare_data()
     dm.setup("test")
@@ -284,7 +284,7 @@ def test_without_adaptation(model: FloodnetMslModuleWrapper | XBDMslModuleWrappe
     if not offline:
         wandb.finish()
 
-def train_adapt(model: FloodnetMslModuleWrapper, datamodule: ZippedDataModule, cfg: dict, offline: bool, n_epochs: int, run_name: str | None = None):
+def train_adapt(model: FRNetMslModuleWrapper, datamodule: ZippedDataModule, cfg: dict, offline: bool, n_epochs: int, run_name: str | None = None):
     experiment_name = run_name or f"t_{DATASET}_msl_{cfg['experiment_name']}"
 
     if not offline:
