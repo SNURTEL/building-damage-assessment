@@ -30,7 +30,7 @@ from inz.data.data_module_frnet import FRNetModule
 from inz.data.event import Event, Hold, Tier1, Tier3, Test
 from inz.data.zipped_data_module import ZippedDataModule
 from inz.models.msl.msl_loss import IW_MaxSquareloss
-from inz.models.msl.msl_module_wrapper import FRNetMslModuleWrapper, XBDMslModuleWrapper
+from inz.models.msl.msl_module_wrapper import FloodNetMslModuleWrapper, XBDMslModuleWrapper, RescueNetMslModuleWrapper
 from inz.util import get_wandb_logger
 
 sys.path.append("inz/farseg")
@@ -192,7 +192,7 @@ def main() -> pl.Trainer:
     _model.class_weights = _model.class_weights.to(device)
 
     if DATASET == "floodnet":
-        model = FRNetMslModuleWrapper(
+        model = FloodNetMslModuleWrapper(
             pl_module=_model,
             n_classes_target=3,
             msl_loss_module=LOSS_FACTORY(num_class=3).to(device),
@@ -200,6 +200,16 @@ def main() -> pl.Trainer:
             optimizer_factory=OPTIM_FACTORY,
             scheduler_factory=SCHED_FACTORY,
             target_conf_matrix_labels=("Background", "Non-flooded", "Flooded"),
+        ).to(device)
+    if DATASET == "rescuenet":
+        model = RescueNetMslModuleWrapper(
+            pl_module=_model,
+            n_classes_target=5,
+            msl_loss_module=LOSS_FACTORY(num_class=5).to(device),
+            msl_lambda=MSL_LAMBDA,
+            optimizer_factory=OPTIM_FACTORY,
+            scheduler_factory=SCHED_FACTORY,
+            target_conf_matrix_labels=["Background", "No damage", "Minor damage", "Major damage", "Destroyed"],
         ).to(device)
     else:
         model = XBDMslModuleWrapper(
@@ -252,7 +262,7 @@ def main() -> pl.Trainer:
     return
 
 
-def test_without_adaptation(model: FRNetMslModuleWrapper | XBDMslModuleWrapper, datamodule: ZippedDataModule, cfg: dict, offline: bool, run_name: str | None = None):
+def test_without_adaptation(model: FloodNetMslModuleWrapper | XBDMslModuleWrapper, datamodule: ZippedDataModule, cfg: dict, offline: bool, run_name: str | None = None):
     dm = deepcopy(datamodule)
     dm.prepare_data()
     dm.setup("test")
@@ -284,7 +294,7 @@ def test_without_adaptation(model: FRNetMslModuleWrapper | XBDMslModuleWrapper, 
     if not offline:
         wandb.finish()
 
-def train_adapt(model: FRNetMslModuleWrapper, datamodule: ZippedDataModule, cfg: dict, offline: bool, n_epochs: int, run_name: str | None = None):
+def train_adapt(model: FloodNetMslModuleWrapper, datamodule: ZippedDataModule, cfg: dict, offline: bool, n_epochs: int, run_name: str | None = None):
     experiment_name = run_name or f"t_{DATASET}_msl_{cfg['experiment_name']}"
 
     if not offline:

@@ -52,30 +52,12 @@ FLOODNET_CLASS_WEIGHTS = torch.Tensor([0.01, 0.5, 1.]).to(device)
 
 #############################################################################################
 
-# def _floodnet_module_adapter(model_class: Type) -> Type:
-#     def forward(self, x: torch.Tensor) -> torch.Tensor:
-#         preds = self.model(x)
-#         return torch.cat([preds[:, :2, ...], preds[:, 2:, ...].max(dim=1, keepdim=True).values], dim=1)
-
-#     class_init = model_class.__init__
-
-#     # This is not how this works. This is not how any of this works.
-#     base_class = model_class.__bases__[0]
-#     # base_class = [c for c in model_class.__mro__ if c is BasePLModule][0]
-
-#     model_class.__init__ = partialmethod(class_init, n_classes=3)
-#     base_class.forward = forward
-#     return model_class
-
 def get_model(ckpt_path: Path, cfg: dict, wrap_floodnet: bool) -> BasePLModule:
     model_class_str = cfg["module"]["module"]["_target_"]
     model_class_name = model_class_str.split(".")[-1]
     module_path = ".".join(model_class_str.split(".")[:-1])
     imported_module = importlib.import_module(module_path)
     model_class = getattr(imported_module, model_class_name)
-
-    # if wrap_floodnet:
-    #     model_class = _floodnet_module_adapter(model_class)
 
     model_partial = hydra.utils.instantiate(cfg["module"]["module"])
 
@@ -144,15 +126,35 @@ def get_floodnet_datamodule(batch_size: int, num_workers: int = 2) -> FRNetModul
     )
     return dm
 
+def get_rescuenet_datamodule(batch_size: int, num_workers: int = 2) -> FRNetModule:
+    dm = FRNetModule(
+        path=Path(PROJECT_DIR / "data/rescuenet_processed_512/RescueNet"),
+        train_batch_size=batch_size,
+        val_batch_size=batch_size,
+        test_batch_size=batch_size,
+        transform=T.Compose(
+            transforms=[
+                T.RandomHorizontalFlip(p=0.5),
+                T.RandomApply(
+                    p=0.6, transforms=[T.RandomAffine(degrees=(-10, 10), scale=(0.9, 1.1), translate=(0.1, 0.1))]
+                ),
+            ]
+        ),
+        num_workers=num_workers
+    )
+    return dm
+
 
 def parse_args() -> SimpleNamespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--hydra-config", help="Hydra config dumped in training process", required=True)
     parser.add_argument("-c", "--checkpoint-path", help="Checkpoint to use", required=True)
     parser.add_argument(
-        "-r", "--run-name", help="Run name; defaults to t_{original_run_name}", required=False, default=None
+        "--run-name", help="Run name; defaults to t_{original_run_name}", required=False, default=None
     )
     parser.add_argument("-e", "--events", help="Events to test on; comma-separated list of events", default=None)
+    parser.add_argument("-f" ,"--floodnet", action=argparse.BooleanOptionalAction, help="Use the floodnet dataset", default=False)
+    parser.add_argument("-r", "--rescuenet", help="Use RescueNet dataset. Specifying either -f, -r or -e is required.", action=argparse.BooleanOptionalAction)
     parser.add_argument(
         "-n",
         "--num-epochs",
@@ -162,7 +164,6 @@ def parse_args() -> SimpleNamespace:
         default=20,
     )
     parser.add_argument("--offline", action=argparse.BooleanOptionalAction, help="Do not log to wandb", default=False)
-    parser.add_argument("--floodnet", action=argparse.BooleanOptionalAction, help="Use the floodnet dataset", default=False)
     parser.add_argument(
         "--skip-initial",
         action=argparse.BooleanOptionalAction,
@@ -172,7 +173,7 @@ def parse_args() -> SimpleNamespace:
 
     args = parser.parse_args()
 
-    assert bool(args.events) != bool(args.floodnet), "Provide either --events or --floodnet"
+    assert bool(args.events) + bool(args.floodnet) + bool(args.rescuenet) == 1, "Provide exactly one of (--events, --floodnet, --rescuenet)"
 
     return args
 
@@ -183,6 +184,10 @@ def main():
 
     if args.floodnet:
         dm = get_floodnet_datamodule(
+            batch_size=cfg["datamodule"]["datamodule"]["train_batch_size"]
+        )
+    elif args.rescuenet:
+        dm = get_rescuenet_datamodule(
             batch_size=cfg["datamodule"]["datamodule"]["train_batch_size"]
         )
     else:
@@ -197,7 +202,8 @@ def main():
         wrap_floodnet=args.floodnet
     )
 
-    experiment_name = args.run_name or "t_finetune_" + ("floodnet_" if args.floodnet else "") + f"{cfg['experiment_name']}"
+    dataset = "floodnet" if args.floodnet else ("rescuenet" if args.rescuenet else "xbd")
+    experiment_name = args.run_name or f"t_finetune_{dataset}_{cfg['experiment_name']}"
     if not args.offline:
         wandb_logger = get_wandb_logger(
             run_name=experiment_name,
@@ -208,10 +214,10 @@ def main():
         wandb_logger.experiment.config["hydra_cfg"] = cfg
         wandb_logger.experiment.config["optim_factory"] = repr(OPTIM_FACTORY)
         wandb_logger.experiment.config["sched_factory"] = repr(SCHED_FACTORY)
-        wandb_logger.experiment.config["dataset"] = "floodnet" if args.floodnet else "xbd"
+        wandb_logger.experiment.config["dataset"] = dataset
         if args.floodnet:
             wandb_logger.experiment.config["class_weights"] = FLOODNET_CLASS_WEIGHTS
-        if not args.floodnet:
+        if args.events:
             wandb_logger.experiment.config["finetine_events"] = list(sorted(events))
 
 

@@ -72,6 +72,10 @@ class BaseMSLModuleWrapper(pl.LightningModule):
     @abstractmethod
     def forward_target(self, x: Tensor) -> Tensor: ...
 
+
+    def forward(self, x: Tensor) -> Tensor:
+        return self.forward_target(x)
+
     def training_step(self, batch: tuple[list[Tensor], list[Tensor]], batch_idx: int):
         optimizer = self.optimizers()
 
@@ -207,7 +211,11 @@ class XBDMslModuleWrapper(BaseMSLModuleWrapper):
         return self.inner(x)
 
 
-class FRNetMslModuleWrapper(BaseMSLModuleWrapper):
+class FloodNetMslModuleWrapper(BaseMSLModuleWrapper):
     def forward_target(self, x: Tensor) -> Tensor:
         preds = self.inner(x)
         return torch.cat([preds[:, :2, ...], preds[:, 2:, ...].max(dim=1, keepdim=True).values], dim=1)
+
+class RescueNetMslModuleWrapper(BaseMSLModuleWrapper):
+    def forward_target(self, x: Tensor) -> Tensor:
+        return self.inner(x)
