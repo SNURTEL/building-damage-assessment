@@ -64,7 +64,7 @@ def plot_ploygons(
                         "subtype": <BuildingDamage>,
                         ...,
                     },
-                    "wkt": POLYGON "((x1 Y1, X2 Y2, ..., XN Yn))"
+                    "wkt": POLYGON "((X1 Y1, X2 Y2, ..., XN Yn))"
                 },
                 ...
             ],
@@ -141,7 +141,7 @@ def make_mask(labels_path: Path | str, img_size: tuple[int, int]) -> np.ndarray:
 
     rasterized_layers = [rasterized.get(i, np.zeros(img_size, dtype=np.uint8)) for i in range(6)]
     stacked = np.stack(rasterized_layers)
-    stacked[0] = (stacked.sum(axis=0) == 0).astype(np.uint8) 
+    stacked[0] = (stacked.sum(axis=0) == 0).astype(np.uint8)
     return stacked.transpose((1, 2, 0))  # type: ignore[no-any-return]
 
 
@@ -159,7 +159,7 @@ if __name__ == "__main__":
 
     todos_t = Literal["images", "masks", "preview"]
 
-    def process_single_image(img_path: Path, patch_size: int, todos: Collection[todos_t], out_path: Path) -> None:
+    def process_single_image(img_path: Path, patch_size: int, todos: Collection[todos_t], out_path: Path, dry_run: bool) -> None:
         OUT_MASKS_PATH = out_path / "masks"
         OUT_IMAGES_PATH = out_path / "images"
         OUT_JPEGS_PATH = out_path / "jpegs"
@@ -215,12 +215,14 @@ if __name__ == "__main__":
 
             for patch_num, out_path in enumerate(out_paths):
                 patch = patches[patch_num % n_patches_h, patch_num // n_patches_w, 0]
+                if dry_run:
+                    continue
                 save(out_path, patch)
 
 
 
-    def wrapper(img_path: Path, patch_size: int, todos: Collection[todos_t], out_path: Path) -> Path:
-        process_single_image(img_path, patch_size, todos, out_path)
+    def wrapper(img_path: Path, patch_size: int, todos: Collection[todos_t], out_path: Path, dry_run: bool) -> Path:
+        process_single_image(img_path, patch_size, todos, out_path, dry_run)
         return img_path
 
     all_todos = {"images", "masks", "preview"}
@@ -228,11 +230,12 @@ if __name__ == "__main__":
     parser.add_argument("patch_size", type=int, help="Size of an individual patch after split")
     parser.add_argument("out_path", type=Path, help="Output directory")
     parser.add_argument("todos", nargs="+", choices=all_todos | {"all"})
+    parser.add_argument("--dry-run", action=argparse.BooleanOptionalAction, help="Do not perform any writes")
     args = parser.parse_args()
     todos = set(args.todos) if "all" not in args.todos else all_todos
 
     with ProcessPoolExecutor() as executor:
-        tasks = [executor.submit(wrapper, img_path, args.patch_size, todos, args.out_path) for img_path in DATASET_PATH.rglob(rglob)]
+        tasks = [executor.submit(wrapper, img_path, args.patch_size, todos, args.out_path, args.dry_run) for img_path in DATASET_PATH.rglob(rglob)]
 
         try:
             for task in tqdm(as_completed(tasks), total=num_images, desc=f"Creating {', '.join(todos)}"):

@@ -3,10 +3,9 @@ import datetime
 import importlib
 import os
 import sys
-from functools import partial, partialmethod
+from functools import partial
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Type
 
 import dotenv
 import hydra
@@ -14,7 +13,6 @@ import pytorch_lightning as pl
 import torch
 import torchvision.transforms as T
 from hydra import compose, initialize
-
 
 if Path.cwd().stem == "scripts":
     PROJECT_DIR = Path.cwd().parent
@@ -26,13 +24,13 @@ sys.path.append(str(PROJECT_DIR))
 
 from inz.data.data_module import XBDDataModule
 from inz.data.data_module_frnet import FRNetModule
-from inz.data.event import Event, Hold, Tier1, Tier3, Test
+from inz.data.event import Event, Hold, Test, Tier1, Tier3
 from inz.models.base_pl_module import BasePLModule
-from inz.models.farseg_singlebranch_module import SingleBranchFarSegModule
 from inz.util import get_wandb_logger
 
-sys.path.append("inz/farseg")
-sys.path.append("inz/dahitra")
+sys.path.append("inz/external/farseg")
+sys.path.append("inz/external/dahitra")
+sys.path.append("inz/external/xview2_strong_baseline")
 
 dotenv.load_dotenv()
 RANDOM_SEED = 123

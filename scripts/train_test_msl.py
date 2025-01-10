@@ -14,8 +14,9 @@ import hydra
 import pytorch_lightning as pl
 import torch
 import torchvision.transforms as T
-import wandb
 from hydra import compose, initialize
+
+import wandb
 
 if Path.cwd().stem == "scripts":
     PROJECT_DIR = Path.cwd().parent
@@ -27,26 +28,15 @@ sys.path.append(str(PROJECT_DIR))
 
 from inz.data.data_module import XBDDataModule
 from inz.data.data_module_frnet import FRNetModule
-from inz.data.event import Event, Hold, Tier1, Tier3, Test
+from inz.data.event import Event, Hold, Test, Tier1, Tier3
 from inz.data.zipped_data_module import ZippedDataModule
 from inz.models.msl.msl_loss import IW_MaxSquareloss
-from inz.models.msl.msl_module_wrapper import FloodNetMslModuleWrapper, XBDMslModuleWrapper, RescueNetMslModuleWrapper
+from inz.models.msl.msl_module_wrapper import FloodNetMslModuleWrapper, RescueNetMslModuleWrapper, XBDMslModuleWrapper
 from inz.util import get_wandb_logger
 
-sys.path.append("inz/farseg")
-sys.path.append("inz/dahitra")
-
-
-
-
-
-
-# ############################# TODO USE PROPER NAMES
-
-
-
-
-
+sys.path.append("inz/external/farseg")
+sys.path.append("inz/external/dahitra")
+sys.path.append("inz/external/xview2_strong_baseline")
 
 
 # ##################################### CONFIG ##############################################
@@ -66,13 +56,10 @@ MSL_LAMBDA = 0.5
 DATASET: Literal["floodnet", "xbd", "rescuenet"] | None = None
 
 
-def get_xbd_datamodule(events: list[Event], batch_size: int, num_workers: int = 2, val_fraction: float = 0.5) -> XBDDataModule:
-    events_config = {
-        Tier1: [],
-        Tier3: [],
-        Test: [],
-        Hold: []
-    }
+def get_xbd_datamodule(
+    events: list[Event], batch_size: int, num_workers: int = 2, val_fraction: float = 0.5
+) -> XBDDataModule:
+    events_config = {Tier1: [], Tier3: [], Test: [], Hold: []}
     for event in events:
         for split in (Tier1, Tier3, Test, Hold):
             if event in split.events:
@@ -85,7 +72,7 @@ def get_xbd_datamodule(events: list[Event], batch_size: int, num_workers: int = 
         val_batch_size=batch_size,
         test_batch_size=batch_size,
         val_fraction=val_fraction,
-        test_fraction=0.,
+        test_fraction=0.0,
         num_workers=num_workers,
         transform=T.Compose(
             transforms=[
@@ -111,20 +98,20 @@ def get_rescuenet_datamodule(batch_size: int, num_workers: int = 2) -> FRNetModu
 
 def _get_floodnet_rescuenet_datamodule(path: Path, batch_size: int, num_workers: int) -> FRNetModule:
     dm = FRNetModule(
-            path=path,
-            train_batch_size=batch_size,
-            val_batch_size=batch_size,
-            test_batch_size=batch_size,
-            transform=T.Compose(
-                transforms=[
-                    T.RandomHorizontalFlip(p=0.5),
-                    T.RandomApply(
-                        p=0.6, transforms=[T.RandomAffine(degrees=(-10, 10), scale=(0.9, 1.1), translate=(0.1, 0.1))]
-                    ),
-                ]
-            ),
-            num_workers=num_workers
-        )
+        path=path,
+        train_batch_size=batch_size,
+        val_batch_size=batch_size,
+        test_batch_size=batch_size,
+        transform=T.Compose(
+            transforms=[
+                T.RandomHorizontalFlip(p=0.5),
+                T.RandomApply(
+                    p=0.6, transforms=[T.RandomAffine(degrees=(-10, 10), scale=(0.9, 1.1), translate=(0.1, 0.1))]
+                ),
+            ]
+        ),
+        num_workers=num_workers,
+    )
     return dm
 
 
@@ -138,11 +125,33 @@ def main() -> pl.Trainer:
     parser = ArgumentParser()
     parser.add_argument("-d", "--hydra-config", help="Hydra config dumped in training process", required=True)
     parser.add_argument("-c", "--checkpoint-path", help="Checkpoint to use", required=True)
-    parser.add_argument("-f", "--floodnet", help="Use FloodNet dataset. Specifying either -f, -r or -e is required.", action=argparse.BooleanOptionalAction)
-    parser.add_argument("-r", "--rescuenet", help="Use RescueNet dataset. Specifying either -f, -r or -e is required.", action=argparse.BooleanOptionalAction)
-    parser.add_argument("-e", "--events", help="Events to test on; comma-separated list of events, Specifying either -f or -e is required.", default=None)
-    parser.add_argument("-s", "--size", choices=("min", "max"), nargs=1, default="max", help="How to match \
-                        dataset sizes: min to crop the larger dataset, max to repeat the smaller one")
+    parser.add_argument(
+        "-f",
+        "--floodnet",
+        help="Use FloodNet dataset. Specifying either -f, -r or -e is required.",
+        action=argparse.BooleanOptionalAction,
+    )
+    parser.add_argument(
+        "-r",
+        "--rescuenet",
+        help="Use RescueNet dataset. Specifying either -f, -r or -e is required.",
+        action=argparse.BooleanOptionalAction,
+    )
+    parser.add_argument(
+        "-e",
+        "--events",
+        help="Events to test on; comma-separated list of events, Specifying either -f or -e is required.",
+        default=None,
+    )
+    parser.add_argument(
+        "-s",
+        "--size",
+        choices=("min", "max"),
+        nargs=1,
+        default="max",
+        help="How to match \
+                        dataset sizes: min to crop the larger dataset, max to repeat the smaller one",
+    )
     parser.add_argument(
         "--run-name", help="Run name; defaults to t_floodnet_{original_run_name}", required=False, default=None
     )
@@ -164,7 +173,9 @@ def main() -> pl.Trainer:
 
     args = parser.parse_args()
 
-    assert bool(args.events) + bool(args.floodnet) + bool(args.rescuenet) == 1, "Provide exactly one of (--events, --floodnet, --rescuenet)"
+    assert (
+        bool(args.events) + bool(args.floodnet) + bool(args.rescuenet) == 1
+    ), "Provide exactly one of (--events, --floodnet, --rescuenet)"
 
     global DATASET
     if args.floodnet:
@@ -235,9 +246,7 @@ def main() -> pl.Trainer:
     else:
         events = {Event(event_name) for event_name in args.events.replace("_", "-").split(",")}
         _dm_target = get_xbd_datamodule(
-            events=events,
-            batch_size=cfg["datamodule"]["datamodule"]["train_batch_size"],
-            val_fraction=0.
+            events=events, batch_size=cfg["datamodule"]["datamodule"]["train_batch_size"], val_fraction=0.0
         )
 
     dm = ZippedDataModule(
@@ -257,12 +266,20 @@ def main() -> pl.Trainer:
     if not args.skip_initial:
         test_without_adaptation(model=model, datamodule=dm, cfg=cfg, offline=args.offline, run_name=args.run_name)
 
-    train_adapt(model=model, datamodule=dm, n_epochs=args.num_epochs, cfg=cfg, offline=args.offline, run_name=args.run_name)
+    train_adapt(
+        model=model, datamodule=dm, n_epochs=args.num_epochs, cfg=cfg, offline=args.offline, run_name=args.run_name
+    )
 
     return
 
 
-def test_without_adaptation(model: FloodNetMslModuleWrapper | XBDMslModuleWrapper, datamodule: ZippedDataModule, cfg: dict, offline: bool, run_name: str | None = None):
+def test_without_adaptation(
+    model: FloodNetMslModuleWrapper | XBDMslModuleWrapper,
+    datamodule: ZippedDataModule,
+    cfg: dict,
+    offline: bool,
+    run_name: str | None = None,
+):
     dm = deepcopy(datamodule)
     dm.prepare_data()
     dm.setup("test")
@@ -286,7 +303,7 @@ def test_without_adaptation(model: FloodNetMslModuleWrapper | XBDMslModuleWrappe
         sync_batchnorm=True,
         callbacks=[pl.callbacks.RichProgressBar()],
         logger=wandb_logger if not offline else None,
-        log_every_n_steps=10
+        log_every_n_steps=10,
     )
 
     trainer.test(model=model, datamodule=dm)
@@ -294,7 +311,15 @@ def test_without_adaptation(model: FloodNetMslModuleWrapper | XBDMslModuleWrappe
     if not offline:
         wandb.finish()
 
-def train_adapt(model: FloodNetMslModuleWrapper, datamodule: ZippedDataModule, cfg: dict, offline: bool, n_epochs: int, run_name: str | None = None):
+
+def train_adapt(
+    model: FloodNetMslModuleWrapper,
+    datamodule: ZippedDataModule,
+    cfg: dict,
+    offline: bool,
+    n_epochs: int,
+    run_name: str | None = None,
+):
     experiment_name = run_name or f"t_{DATASET}_msl_{cfg['experiment_name']}"
 
     if not offline:
@@ -327,12 +352,13 @@ def train_adapt(model: FloodNetMslModuleWrapper, datamodule: ZippedDataModule, c
                 monitor="challenge_score_target",
                 mode="max",
                 filename=experiment_name
-                + "-{epoch:02d}-{step:03d}-{challenge_score_target:.4f}-best-challenge-" + f"{DATASET}",
+                + "-{epoch:02d}-{step:03d}-{challenge_score_target:.4f}-best-challenge-"
+                + f"{DATASET}",
                 save_last=False,
             ),
         ],
         logger=wandb_logger if not offline else None,
-        log_every_n_steps=10
+        log_every_n_steps=10,
     )
 
     trainer.fit(model=model, datamodule=datamodule)

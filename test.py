@@ -1,7 +1,8 @@
+import argparse
 import importlib
 import sys
-import argparse
 from argparse import ArgumentParser
+from pprint import pprint
 
 import dotenv
 import hydra
@@ -10,10 +11,11 @@ import torch
 from hydra import compose, initialize
 from pytorch_lightning.callbacks import RichProgressBar
 
-from inz.data.event import Event, Hold, Tier1, Tier3, Test
+from inz.data.event import Event, Hold, Test, Tier1, Tier3
 
-sys.path.append("inz/farseg")
-sys.path.append("inz/dahitra")
+sys.path.append("inz/external/farseg")
+sys.path.append("inz/external/dahitra")
+sys.path.append("inz/external/xview2_strong_baseline")
 
 
 from inz.data.data_module import XBDDataModule
@@ -30,14 +32,18 @@ def main() -> pl.Trainer:
     parser = ArgumentParser()
     parser.add_argument("-d", "--hydra-config", help="Hydra config dumped in training process", required=True)
     parser.add_argument("-c", "--checkpoint-path", help="Checkpoint to use", required=True)
-    parser.add_argument("-e", "--events", help="Events to test on; either \"hold\" (all hold events) or a comma-separated list of events", required=True)
+    parser.add_argument(
+        "-e",
+        "--events",
+        help='Events to test on; either "hold" (all hold events) or a comma-separated list of events',
+        required=True,
+    )
     parser.add_argument(
         "-r", "--run-name", help="Run name; defaults to t_{original_run_name}", required=False, default=None
     )
     parser.add_argument("--offline", action=argparse.BooleanOptionalAction, help="Do not log to wandb", default=False)
 
     args = parser.parse_args()
-
 
     with initialize(version_base="1.3", config_path=args.hydra_config):
         cfg = compose(config_name="config", overrides=[])
@@ -74,19 +80,13 @@ def main() -> pl.Trainer:
         }
     else:
         events_l = set(args.events.replace("_", "-").split(","))
-        events = {
-            Tier1: [],
-            Tier3: [],
-            Test: [],
-            Hold: []
-        }
+        events = {Tier1: [], Tier3: [], Test: [], Hold: []}
         for event_name in events_l:
             event = Event(event_name)
             for split in (Tier1, Tier3, Test, Hold):
                 if event in split.events:
                     events[split].append(event)
 
-    from pprint import pprint
     pprint(events)
     dm = XBDDataModule(
         path=cfg["datamodule"]["datamodule"]["path"],
@@ -113,8 +113,10 @@ def main() -> pl.Trainer:
         wandb_logger.experiment.config["hydra_cfg"] = cfg
 
     trainer = pl.Trainer(
-        max_epochs=1, callbacks=[RichProgressBar()], precision="bf16-mixed",
-        logger=wandb_logger if not args.offline else None
+        max_epochs=1,
+        callbacks=[RichProgressBar()],
+        precision="bf16-mixed",
+        logger=wandb_logger if not args.offline else None,
     )
     trainer.test(model, datamodule=dm)
 

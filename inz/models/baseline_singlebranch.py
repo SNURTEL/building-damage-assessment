@@ -1,10 +1,21 @@
+import os
+import sys
+from pathlib import Path
+
 import torch
 
 from inz.models.baseline_module import BaselineModule
-from inz.xview2_strong_baseline.legacy.zoo.models import Res34_Unet_Double
+
+cwd = Path().resolve()
+sys.path.append("inz/external/xview2_strong_baseline")
+os.chdir(cwd / "inz/external/xview2_strong_baseline/legacy")
+
+from inz.legacy.zoo.models import Res34_Unet_Double  # type: ignore # noqa: E402
 
 
 class BaselineSingleBranchModule(Res34_Unet_Double):
+    """Modified version of the Strong Baseline model with a single branch."""
+
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         # reduce the filter number by half
@@ -17,9 +28,11 @@ class BaselineSingleBranchModule(Res34_Unet_Double):
 
 
 class SingleBranchBaselinePLModule(BaselineModule):
+    """Modified version of the BaselineModule with a single branch."""
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # pretend you didn't see anything
+        # ignore the first 3 channels (first image)
         return super().forward(x[:, 3:, ...])

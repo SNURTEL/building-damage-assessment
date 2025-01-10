@@ -27,6 +27,20 @@ class BaseMSLModuleWrapper(pl.LightningModule):
         scheduler_factory: Callable[[Any], torch.optim.lr_scheduler.LRScheduler] | None = None,
         target_conf_matrix_labels: list[str] | None = None,
     ):
+        """
+        Initializes the MSLModuleWrapper.
+
+        Args:
+            pl_module (BasePLModule): The base PyTorch Lightning module.
+            n_classes_target (int): The number of target classes.
+            msl_loss_module (torch.nn.Module): The MSL loss module.
+            msl_lambda (float): The MSL lambda param value.
+            optimizer_factory (Callable[[Any], torch.optim.Optimizer]): The optimizer factory function.
+            scheduler_factory (Callable[[Any], torch.optim.lr_scheduler.LRScheduler] | None, optional):
+                The LR scheduler factory function. Defaults to None.
+            target_conf_matrix_labels (list[str] | None, optional): The target confusion matrix labels.
+                Defaults to None.
+        """
         super(BaseMSLModuleWrapper, self).__init__()
         n_classes_source = pl_module.n_classes
         self.n_classes_source = n_classes_source
@@ -66,17 +80,45 @@ class BaseMSLModuleWrapper(pl.LightningModule):
 
         self.target_conf_matrix_labels = target_conf_matrix_labels
 
-        self.best_challenge_score_target = 0.
+        self.best_challenge_score_target = 0.0
         self.best_challenge_score_target_epoch = None
 
     @abstractmethod
-    def forward_target(self, x: Tensor) -> Tensor: ...
+    def forward_target(self, x: Tensor) -> Tensor:
+        """
+        Performs the forward pass of target domain input.
 
+        Args:
+            x (Tensor): The input tensor.
+
+        Returns:
+            Tensor: The output tensor.
+        """
+        ...
 
     def forward(self, x: Tensor) -> Tensor:
+        """
+        Forward pass of the module.
+
+        Args:
+            x: Input tensor.
+
+        Returns:
+            Output tensor.
+        """
         return self.forward_target(x)
 
     def training_step(self, batch: tuple[list[Tensor], list[Tensor]], batch_idx: int):
+        """
+        Perform a single training step.
+
+        Args:
+            batch: A tuple containing two lists of Tensors representing the source and target batches.
+            batch_idx: An integer representing the index of the current batch.
+
+        Returns:
+            None
+        """
         optimizer = self.optimizers()
 
         source_batch, target_batch = batch
@@ -96,6 +138,13 @@ class BaseMSLModuleWrapper(pl.LightningModule):
         optimizer.zero_grad()
 
     def _do_eval_step(self, batch: tuple[list[Tensor], list[Tensor]]):
+        """
+        Perform a single evaluation step.
+
+        Args:
+            batch (tuple): A tuple containing two lists of Tensors representing the source and target batches.
+
+        """
         source_batch, target_batch = batch
         s_img_pre, s_mask_pre, s_img_post, s_mask_post = source_batch
         t_img_pre, t_mask_pre, t_img_post, t_mask_post = target_batch
@@ -135,13 +184,21 @@ class BaseMSLModuleWrapper(pl.LightningModule):
             for i in range(getattr(self, f"n_classes_{domain}")):
                 metric_attr = f"f1_{domain}_per_class"
                 self.log(
-                    f"f1_{domain}_{i}",
-                    getattr(self, metric_attr)[i],
-                    metric_attribute=metric_attr,
-                    **common_log_kwargs
+                    f"f1_{domain}_{i}", getattr(self, metric_attr)[i], metric_attribute=metric_attr, **common_log_kwargs
                 )
 
     def _do_on_eval_epoch_end(self):
+        """
+        Perform evaluation operations at the end of each epoch.
+
+        This method calculates the F1 scores for the source and target classes, as well as the F1 scores for the source and target locations.
+        It then calculates the challenge scores for the source and target based on the F1 scores.
+        The best challenge score for the target is updated if the current challenge score is higher.
+        Finally, if the logger has the `log_image` attribute, it plots and logs the confusion matrix as an image.
+
+        Note: This method does not specify argument and return types in the docstring.
+
+        """
         f1_source_class = self.f1_source_per_class.compute()
         f1_loc_source = self.f1_loc_source.compute()
         f1_target_class = self.f1_target_per_class.compute()
@@ -168,9 +225,7 @@ class BaseMSLModuleWrapper(pl.LightningModule):
 
         fig, ax = plt.subplots(figsize=(10, 10))
 
-        self.confusion_matrix_target.plot(
-            ax=ax, labels=self.target_conf_matrix_labels, cmap="Greens"
-        )
+        self.confusion_matrix_target.plot(ax=ax, labels=self.target_conf_matrix_labels, cmap="Greens")
 
         buf = io.BytesIO()
         fig.savefig(buf, format="png", bbox_inches="tight")
@@ -182,22 +237,64 @@ class BaseMSLModuleWrapper(pl.LightningModule):
         )
 
     def on_train_epoch_end(self):
+        """
+        This method is called at the end of each training epoch.
+
+        It performs the following steps:
+        1. Retrieves the learning rate scheduler.
+        2. Updates the learning rate using the scheduler.
+
+        Note: This method does not take any arguments and does not return anything.
+        """
         scheduler = self.lr_schedulers()
         scheduler.step()
 
     def test_step(self, batch: tuple[list[Tensor], list[Tensor]]):
+        """
+        Perform a test step on the given batch.
+
+        Parameters:
+        - batch: A tuple containing two lists of Tensors representing the input and target data.
+
+        Returns:
+        None
+        """
         self._do_eval_step(batch)
 
     def on_test_epoch_end(self):
+        """
+        Perform actions at the end of each test epoch.
+
+        This method is called at the end of each test epoch to perform any necessary actions or calculations.
+
+        """
         self._do_on_eval_epoch_end()
 
     def validation_step(self, batch: list[Tensor], batch_idx: int):
+        """
+        Performs a validation step.
+
+        Args:
+            batch: The input batch of data.
+            batch_idx: The index of the current batch.
+
+        """
         self._do_eval_step(batch)
 
     def on_validation_epoch_end(self):
+        """
+        Perform any necessary operations at the end of each validation epoch.
+        """
         self._do_on_eval_epoch_end()
 
     def configure_optimizers(self):
+        """
+        Configures the optimizers for the model.
+
+        Returns:
+            If a scheduler factory is provided, returns a tuple containing the optimizer and the scheduler.
+            If no scheduler factory is provided, returns the optimizer.
+        """
         optimizer = self.optimizer_factory(self.inner.model.parameters())
         if self.scheduler_factory:
             scheduler = self.scheduler_factory(optimizer)
@@ -215,6 +312,7 @@ class FloodNetMslModuleWrapper(BaseMSLModuleWrapper):
     def forward_target(self, x: Tensor) -> Tensor:
         preds = self.inner(x)
         return torch.cat([preds[:, :2, ...], preds[:, 2:, ...].max(dim=1, keepdim=True).values], dim=1)
+
 
 class RescueNetMslModuleWrapper(BaseMSLModuleWrapper):
     def forward_target(self, x: Tensor) -> Tensor:

@@ -1,22 +1,17 @@
-from abc import ABC, abstractmethod
 import io
-from typing import Any, Callable
+from abc import ABC, abstractmethod
 
-from matplotlib import pyplot as plt
 import pytorch_lightning as pl
+import pytorch_lightning.loggers
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 import torchmetrics
 import torchmetrics.classification
 import torchmetrics.segmentation
-from torch import Tensor
 import torchvision
-import gc
+from matplotlib import pyplot as plt
 from PIL import Image
-
-import pytorch_lightning.loggers
-import wandb
+from torch import Tensor
 
 
 class BasePLModule(pl.LightningModule, ABC):
@@ -24,12 +19,22 @@ class BasePLModule(pl.LightningModule, ABC):
 
     def __init__(
         self,
-        model: nn.Module,
-        optimizer_factory: Callable[[Any], torch.optim.Optimizer],
-        scheduler_factory: Callable[[Any], torch.optim.lr_scheduler.LRScheduler] | None = None,
-        class_weights: Tensor | None = None,
-        n_classes: int = 5,
+        model,
+        optimizer_factory,
+        scheduler_factory=None,
+        class_weights=None,
+        n_classes=5,
     ):
+        """
+        Initializes the BasePLModule.
+
+        Args:
+            model: The neural network model.
+            optimizer_factory: A callable that creates an optimizer.
+            scheduler_factory: A callable that creates a learning rate scheduler (optional).
+            class_weights: The weights for each class (optional).
+            n_classes: The number of classes (default is 5).
+        """
         super(BasePLModule, self).__init__()
         # n classes
         self.n_classes = n_classes
@@ -42,27 +47,6 @@ class BasePLModule(pl.LightningModule, ABC):
 
         self.optimizer_factory = optimizer_factory
         self.scheduler_factory = scheduler_factory
-
-        # region DELETE THIS IF PREVIOUS METRICS WERE TRULY BROKEN
-
-        # self.accuracy_loc = torchmetrics.classification.BinaryAccuracy()
-        # self.iou_loc = torchmetrics.segmentation.MeanIoU(num_classes=2)
-
-        # self.f1 = torchmetrics.classification.MulticlassF1Score(num_classes=n_classes)
-        # self.precision = torchmetrics.classification.MulticlassPrecision(num_classes=n_classes)
-        # self.recall = torchmetrics.classification.MulticlassRecall(num_classes=n_classes)
-        # self.iou = torchmetrics.segmentation.MeanIoU(num_classes=n_classes)
-
-        # self.f1_per_class = torchmetrics.classification.MulticlassF1Score(num_classes=n_classes, average="none")
-        # self.precision_per_class = torchmetrics.classification.MulticlassPrecision(
-        #     num_classes=n_classes, average="none"
-        # )
-        # self.recall_per_class = torchmetrics.classification.MulticlassRecall(num_classes=n_classes, average="none")
-        # self.iou_per_class = torchmetrics.segmentation.MeanIoU(num_classes=n_classes, per_class=True)
-
-        # self.f1_loc = torchmetrics.classification.BinaryF1Score()
-
-        # endregion
 
         # fixed metric computation
         self.accuracy_loc_safe = torchmetrics.classification.BinaryAccuracy()
@@ -82,7 +66,9 @@ class BasePLModule(pl.LightningModule, ABC):
 
         self.f1_loc_safe = torchmetrics.classification.BinaryF1Score()
 
-        self.confusion_matrix_safe = torchmetrics.classification.MulticlassConfusionMatrix(num_classes=n_classes, normalize='true')
+        self.confusion_matrix_safe = torchmetrics.classification.MulticlassConfusionMatrix(
+            num_classes=n_classes, normalize="true"
+        )
 
     @abstractmethod
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -114,18 +100,33 @@ class BasePLModule(pl.LightningModule, ABC):
         ...
 
     def training_step(self, batch: list[Tensor], batch_idx: int) -> Tensor:
+        """
+        Perform a single training step.
+
+        Args:
+            batch: A list of tensors representing the input batch.
+            batch_idx: An integer representing the index of the current batch.
+
+        Returns:
+            The loss value for the training step.
+        """
         loss, class_loss = self.loss(*batch)
 
         class_loss_dict = {f"train_loss_{i}": loss_val for i, loss_val in enumerate(class_loss)}
         self.log_dict(class_loss_dict | {"train_loss": loss}, prog_bar=True, batch_size=batch[0].shape[0])
         return loss  # type: ignore[no-any-return]
 
-    def on_train_epoch_start(self, *args, **kwargs):
-        # lol
-        # gc.collect()
-        return super().on_train_epoch_start(*args, **kwargs)
+    def validation_step(self, batch, batch_idx):
+        """
+        Perform a validation step on the given batch of data.
 
-    def validation_step(self, batch: list[Tensor], batch_idx: int):  # type: ignore[no-untyped-def]
+        Args:
+            batch: A list containing the input tensors for the batch.
+            batch_idx: An integer representing the index of the current batch.
+
+        Returns:
+            None
+        """
         with torch.no_grad():
             images_pre, _, images_post, masks_post = batch
 
@@ -137,51 +138,7 @@ class BasePLModule(pl.LightningModule, ABC):
 
             loss, class_loss = self.loss(*batch)
 
-            # region DELETE THIS IF PREVIOUS METRICS WERE TRULY BROKEN
-            # log_dict = (
-            #     {
-            #         "acc_loc": self.accuracy_loc(
-            #             cls_preds_argmax.gt(0).to(torch.float), masks_post_argmax.gt(0).to(torch.float)
-            #         ),
-            #         "iou_loc": self.iou_loc(
-            #             F.one_hot(cls_preds_argmax.gt(0).to(torch.long), num_classes=2).moveaxis(-1, 1),
-            #             F.one_hot(masks_post_argmax.gt(0).to(torch.long), num_classes=2).moveaxis(-1, 1),
-            #         ),
-            #     }
-            #     | {
-            #         name: getattr(self, name)(cls_preds_argmax, masks_post_argmax)
-            #         for name in ["f1", "precision", "recall"]
-            #     }
-            #     | {"iou": self.iou(cls_preds_masks, masks_post.to(torch.uint8))}
-            #     | {
-            #         f"{name}_{i}": val
-            #         for name, vec in {
-            #             name: getattr(self, f"{name}_per_class")(cls_preds_argmax, masks_post_argmax)
-            #             for name in ["f1", "precision", "recall"]
-            #         }.items()
-            #         for i, val in enumerate(vec)
-            #     }
-            #     | {
-            #         f"iou_{i}": val
-            #         for i, val in enumerate(self.iou_per_class(cls_preds_masks, masks_post.to(torch.uint8)))
-            #     }
-            #     | {f"val_loss_{i}": loss_val for i, loss_val in enumerate(class_loss)}
-            #     | {"val_loss": loss}
-            # )
-            # log_dict = log_dict | {
-            #     "f1_class": self.n_classes / sum([1 / v for k, v in log_dict.items() if k.startswith("f1_")]),
-            #     "f1_loc": self.f1_loc(
-            #         (cls_preds_argmax > 0).to(torch.int), (masks_post_argmax > 0).to(torch.int)
-            #     ),
-            # }
-            # log_dict = log_dict | {"challenge_score": 0.3 * log_dict["f1_loc"] + 0.7 * log_dict["f1_class"]}
-            # self.log_dict(log_dict, prog_bar=True, batch_size=batch[0].shape[0])
-
-            # endregion
-
-            self.accuracy_loc_safe(
-                cls_preds_argmax.gt(0).to(torch.float), masks_post_argmax.gt(0).to(torch.float)
-            )
+            self.accuracy_loc_safe(cls_preds_argmax.gt(0).to(torch.float), masks_post_argmax.gt(0).to(torch.float))
             self.iou_loc_safe(
                 F.one_hot(cls_preds_argmax.gt(0).to(torch.long), num_classes=2).moveaxis(-1, 1),
                 F.one_hot(masks_post_argmax.gt(0).to(torch.long), num_classes=2).moveaxis(-1, 1),
@@ -221,6 +178,13 @@ class BasePLModule(pl.LightningModule, ABC):
                     )
 
     def on_validation_epoch_end(self) -> None:
+        """
+        Hook function called at the end of the validation epoch.
+
+        Computes the f1_per_class_safe, f1_class_safe, and challenge_score_safe metrics
+        and logs them using the LightningLoggerBase.
+
+        """
         super().on_validation_epoch_end()
         f1_per_class_safe = self.f1_per_class_safe.compute()
         f1_class_safe = self.n_classes / sum([1 / f1_per_class_safe[i] for i in range(self.n_classes)])
@@ -229,10 +193,25 @@ class BasePLModule(pl.LightningModule, ABC):
         self.log("challenge_score_safe", challenge_score_safe, prog_bar=True)
 
     def test_step(self, *args, **kwargs) -> Tensor:
+        """
+        Perform a single step of testing (equal to validation step).
+
+        Returns:
+            The output tensor of the testing step.
+        """
         self.eval()
         return self.validation_step(*args, **kwargs)
 
     def on_test_epoch_end(self) -> None:
+        """
+        Hook method called at the end of the testing epoch.
+
+        This method calculates the f1_class_safe and challenge_score_safe metrics,
+        logs them using the logger, and saves the confusion matrix as an image.
+
+        Returns:
+            None
+        """
         super().on_test_epoch_end()
         f1_per_class_safe = self.f1_per_class_safe.compute()
         f1_class_safe = self.n_classes / sum([1 / f1_per_class_safe[i] for i in range(self.n_classes)])
@@ -245,7 +224,9 @@ class BasePLModule(pl.LightningModule, ABC):
 
         fig, ax = plt.subplots(figsize=(10, 10))
 
-        self.confusion_matrix_safe.plot(ax=ax, labels=["Background", "No damage", "Minor damage", "Major damage", "Destroyed"], cmap="Greens")
+        self.confusion_matrix_safe.plot(
+            ax=ax, labels=["Background", "No damage", "Minor damage", "Major damage", "Destroyed"], cmap="Greens"
+        )
 
         buf = io.BytesIO()
         fig.savefig(buf, format="png", bbox_inches="tight")
@@ -257,6 +238,12 @@ class BasePLModule(pl.LightningModule, ABC):
         )
 
     def configure_optimizers(self):  # type: ignore[no-untyped-def]
+        """
+        Configures the optimizers for the model.
+
+        Returns:
+            The configured optimizer and scheduler (is scheduler factory was specified).
+        """
         optimizer = self.optimizer_factory(self.model.parameters())
         if self.scheduler_factory:
             scheduler = self.scheduler_factory(optimizer)

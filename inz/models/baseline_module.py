@@ -1,4 +1,4 @@
-from typing import Any, Callable
+from typing import Callable, Optional
 
 import torch
 import torch.nn as nn
@@ -8,21 +8,34 @@ from inz.models.base_pl_module import BasePLModule
 
 
 class BaselineModule(BasePLModule):
+    """PL wrapper for the Strong Baseline model."""
+
     def __init__(
         self,
         model: nn.Module,
         loss: nn.Module,
-        optimizer_factory: Callable[[Any], torch.optim.Optimizer],
-        scheduler_factory: Callable[[Any], torch.optim.lr_scheduler.LRScheduler] | None = None,
-        class_weights: Tensor | None = None,
+        optimizer_factory: Callable,
+        scheduler_factory: Optional[Callable] = None,
+        class_weights: Optional[Tensor] = None,
         n_classes: int = 5,
-    ):
+    ) -> None:
+        """
+        Initializes the BaselineModule.
+
+        Args:
+            model: The neural network model.
+            loss: The loss function.
+            optimizer_factory: A callable that creates an optimizer.
+            scheduler_factory: A callable that creates a learning rate scheduler (optional).
+            class_weights: The weights for each class (optional).
+            n_classes: The number of classes (default is 5).
+        """
         super(BaselineModule, self).__init__(
             model=model,
             optimizer_factory=optimizer_factory,
             scheduler_factory=scheduler_factory,
             class_weights=class_weights,
-            n_classes=n_classes
+            n_classes=n_classes,
         )
 
         self.loss_fn = loss

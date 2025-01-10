@@ -1,9 +1,9 @@
 [project]
 name = "inz"
 version = "0.1.0"
-description = "Default template for PDM package"
+description = "BSc Thesis on building damage assessment in remotely-sensed imagery"
 authors = [
-    {name = "towienko", email = "tomek.owienko@gmail.com"},
+    {name = "towienko", email = "tomasz.owienko.stud@pw.edu.pl"},
 ]
 dependencies = [
     "pytest>=8.1.1",

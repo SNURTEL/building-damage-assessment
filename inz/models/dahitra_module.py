@@ -1,10 +1,6 @@
 import os
 import sys
 from pathlib import Path
-
-sys.path.append("inz/dahitra")
-
-import sys
 from typing import Any, Callable
 
 import torch
@@ -14,7 +10,9 @@ from torch import Tensor
 from inz.models.base_pl_module import BasePLModule
 
 cwd = Path().resolve()
-os.chdir(cwd / "inz/dahitra/xBD_code")
+sys.path.append("inz/external/dahitra")
+os.chdir(cwd / "inz/external/dahitra/xBD_code")
+
 from xBD_code.zoo.model_transformer_encoding import BASE_Transformer_UNet  # type: ignore # noqa: E402, I001
 from xBD_code.losses import ComboLoss  # type: ignore # noqa: E402, F401
 

@@ -7,15 +7,28 @@ import torch.nn as nn
 
 class MaxSquareloss(nn.Module):
     def __init__(self, ignore_index=-1, num_class=19):
+        """
+        Initializes the MSLLoss class.
+
+        Args:
+            ignore_index: The index to ignore in the loss calculation. Defaults to -1.
+            num_class: The number of classes. Defaults to 19.
+        """
         super().__init__()
         self.ignore_index = ignore_index
         self.num_class = num_class
 
     def forward(self, pred, prob):
         """
-        :param pred: predictions (N, C, H, W)
-        :param prob: probability of pred (N, C, H, W)
-        :return: maximum squares loss
+        Calculates the maximum squares loss.
+
+        Args:
+            pred: Predictions tensor of shape (N, C, H, W).
+            prob: Probability tensor of shape (N, C, H, W).
+
+        Returns:
+            torch.Tensor: Maximum squares loss.
+
         """
         # prob -= 0.5
         mask = prob != self.ignore_index
@@ -24,15 +37,15 @@ class MaxSquareloss(nn.Module):
 
 
 class IW_MaxSquareloss(nn.Module):
-    """
-
-    #############################
-    NO GUARANTEE THIS WORKS
-    #############################
-
-    """
-
     def __init__(self, ignore_index=-1, num_class=19, ratio=0.2):
+        """
+        Initializes the MSLLoss object.
+
+        Args:
+            ignore_index: The index to ignore in the loss calculation. Defaults to -1.
+            num_class: The number of classes. Defaults to 19.
+            ratio: The ratio used for weighting approximated class difficulty in loss calculation. Defaults to 0.2.
+        """
         super().__init__()
         self.ignore_index = ignore_index
         self.num_class = num_class
@@ -40,10 +53,15 @@ class IW_MaxSquareloss(nn.Module):
 
     def forward(self, pred, prob, label=None):
         """
-        :param pred: predictions (N, C, H, W)
-        :param prob: probability of pred (N, C, H, W)
-        :param label(optional): the map for counting label numbers (N, C, H, W)
-        :return: maximum squares loss with image-wise weighting factor
+        Forward pass of the MSL loss function.
+
+        Args:
+            pred: The predicted probabilities of shape (N, C, H, W).
+            prob: The probability tensor of shape (N, C, H, W).
+            label: The label tensor of shape (N, H, W) or None. If None, argpred will be used as the label.
+
+        Returns:
+            The computed loss value.
         """
         # prob -= 0.5
         N, C, H, W = prob.size()

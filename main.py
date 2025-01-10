@@ -2,8 +2,6 @@ import datetime
 import importlib
 import json
 import os
-import random
-import string
 import sys
 from pathlib import Path
 
@@ -14,8 +12,9 @@ import torch
 from omegaconf import DictConfig, OmegaConf
 from pytorch_lightning.callbacks import ModelCheckpoint
 
-sys.path.append("inz/farseg")
-sys.path.append("inz/dahitra")
+sys.path.append("inz/external/farseg")
+sys.path.append("inz/external/dahitra")
+sys.path.append("inz/external/xview2_strong_baseline")
 
 
 from inz.util import get_loc_cls_weights, get_wandb_logger, nested_dict_to_tuples
@@ -43,35 +42,7 @@ def main(cfg: DictConfig) -> pl.Trainer:
     dm.setup("fit")
     print(f"Loaded datamodule with {len(dm.train_dataloader())} train batches, {len(dm.val_dataloader())} val batches")
 
-    if config["module"].get("class_weights") == "auto":
-        WEIGHT_CACHE_FILE = "class_weight_cache.json"
-        try:
-            with open(WEIGHT_CACHE_FILE, mode="r", encoding="utf-8") as fp:
-                weight_cache = json.load(fp)
-        except (FileNotFoundError, json.decoder.JSONDecodeError):
-            weight_cache = {}
-
-        key = str(
-            nested_dict_to_tuples(
-                config["datamodule"]["datamodule"].get("events") or config["datamodule"]["datamodule"].get("split_events")
-            )
-        )
-        print(key)
-        if hit := weight_cache.get(key):
-            print("Found matching class weights in cache")
-            loc_weights = torch.Tensor(hit["loc"]).to(device)
-            cls_weights = torch.Tensor(hit["cls"]).to(device)
-        else:
-            print("Class weights not found in cache")
-            loc_weights, cls_weights = get_loc_cls_weights(
-                dataloader=dm.train_dataloader(), device=device, drop_unclassified_class=True
-            )
-            weight_cache[key] = {"loc": loc_weights.tolist(), "cls": cls_weights.tolist()}
-            with open(WEIGHT_CACHE_FILE, mode="w", encoding="utf-8") as fp:
-                weight_cache = json.dump(weight_cache, fp, indent=4)
-
-        print(f"Localization weights: {loc_weights}\nClassification weights: {cls_weights}")
-    elif config["module"].get("class_weights") is not None:
+    if config["module"].get("class_weights") is not None:
         cls_weights = hydra.utils.instantiate(config["module"]["class_weights"]).to(device)
     else:
         cls_weights = None
@@ -134,7 +105,9 @@ def main(cfg: DictConfig) -> pl.Trainer:
     wandb_logger.experiment.config["class_weights"] = cfg["module"].get("class_weights")
     wandb_logger.experiment.config["optimizer"] = cfg["module"]["module"].get("optimizer_factory")
     wandb_logger.experiment.config["scheduler"] = cfg["module"]["module"].get("scheduler_factory")
-    wandb_logger.experiment.config["events_train"] = cfg["datamodule"]["datamodule"].get("split_events", {}).get("train")
+    wandb_logger.experiment.config["events_train"] = (
+        cfg["datamodule"]["datamodule"].get("split_events", {}).get("train")
+    )
     wandb_logger.experiment.config["events_val"] = cfg["datamodule"]["datamodule"].get("split_events", {}).get("val")
     wandb_logger.experiment.config["events_test"] = cfg["datamodule"]["datamodule"].get("split_events", {}).get("test")
     wandb_logger.experiment.config["events"] = cfg["datamodule"]["datamodule"].get("events")
@@ -144,9 +117,7 @@ def main(cfg: DictConfig) -> pl.Trainer:
     wandb_logger.experiment.config["val_batch_size"] = cfg["datamodule"]["datamodule"]["val_batch_size"]
     wandb_logger.experiment.config["test_batch_size"] = cfg["datamodule"]["datamodule"]["test_batch_size"]
 
-    trainer = hydra.utils.instantiate(config["trainer"]["trainer"])(
-        logger=wandb_logger
-    )
+    trainer = hydra.utils.instantiate(config["trainer"]["trainer"])(logger=wandb_logger)
     for callback in trainer.callbacks:
         if not isinstance(callback, ModelCheckpoint):
             continue

@@ -8,11 +8,14 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 
-sys.path.append("inz/farseg")
-
-from inz.farseg.module.farseg import FarSeg
-from inz.farseg.module.loss import cosine_annealing, linear_annealing, poly_annealing
 from inz.models.base_pl_module import BasePLModule
+
+sys.path.append("inz/farseg")
+sys.path.append("inz/farseg/module")
+sys.path.append("inz/farseg/loss")
+
+from module.farseg import FarSeg
+from loss import cosine_annealing, linear_annealing, poly_annealing
 
 
 class SingleBranchFarSegModule(BasePLModule):
@@ -33,7 +36,7 @@ class SingleBranchFarSegModule(BasePLModule):
         )
 
     def forward(self, x: Tensor) -> Tensor:
-        # this is awkward...
+        # skip the first 3 channels (first image)
         return self.model(x[:, 3:, ...])  # type: ignore[no-any-return]
 
     def loss(

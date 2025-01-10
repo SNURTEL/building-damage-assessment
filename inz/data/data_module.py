@@ -99,16 +99,6 @@ class XBDDataset(Dataset):
             transformed[image_pre.shape[0] + mask_pre.shape[0] + image_post.shape[0] :].long(),
         )
 
-        # if self.drop_unclassified_channel:
-        #     return (
-        #         self.image_transform(image_pre),
-        #         mask_pre[:-1, ...],
-        #         self.image_transform(image_post),
-        #         mask_post[:-1, ...],
-        #     )  # type: ignore[return-value]
-        # else:
-        #     return self.image_transform(image_pre), mask_pre, self.image_transform(image_post), mask_post  # type: ignore[return-value]
-
     def __len__(self) -> int:
         return len(self._image_paths_pre)
 

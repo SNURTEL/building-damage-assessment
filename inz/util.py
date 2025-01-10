@@ -38,17 +38,17 @@ def get_loc_cls_weights(
 
     n_classes = 5 if drop_unclassified_class else 6
 
-    aaa_loc = []
-    aaa_cls = []
+    loc = []
+    cls = []
     for batch in tqdm(dataloader, desc="Computing class weights"):
         _, pre_masks, _, post_masks = batch
         counts_post = torch.bincount(post_masks.argmax(dim=1).reshape(-1), minlength=n_classes)
-        aaa_cls.append(counts_post)
+        cls.append(counts_post)
         counts_pre = torch.bincount(pre_masks.argmax(dim=1).reshape(-1), minlength=n_classes)
-        aaa_loc.append(torch.tensor([counts_pre[0], counts_pre[1:].sum()]))
+        loc.append(torch.tensor([counts_pre[0], counts_pre[1:].sum()]))
 
-    loc_counts = torch.stack(aaa_loc).sum(dim=0).to(torch.float)
-    cls_counts = torch.stack(aaa_cls).sum(dim=0).to(torch.float)
+    loc_counts = torch.stack(loc).sum(dim=0).to(torch.float)
+    cls_counts = torch.stack(cls).sum(dim=0).to(torch.float)
 
     loc_weights = loc_counts.sum() / loc_counts
     loc_weights = (loc_weights / loc_weights.sum()).to(device)

@@ -8,11 +8,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 
-sys.path.append("inz/farseg")
-
-from inz.farseg.module.farseg import FarSeg
-from inz.farseg.module.loss import cosine_annealing, linear_annealing, poly_annealing
 from inz.models.base_pl_module import BasePLModule
+
+sys.path.append("inz/farseg")
+sys.path.append("inz/farseg/module")
+
+from module.farseg import FarSeg
+from module.loss import cosine_annealing, linear_annealing, poly_annealing
 
 
 class DoubleBranchFarSegModule(BasePLModule):

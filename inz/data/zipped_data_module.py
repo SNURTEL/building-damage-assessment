@@ -74,7 +74,6 @@ class ZippedDataModule(pl.LightningDataModule):
         # self._val_dataset = ZippedDataSet(self.dm1._val_dataset, self.dm2._val_dataset, match_type=self.match_type)
         # self._test_dataset = ZippedDataSet(self.dm1._test_dataset, self.dm2._test_dataset, match_type=self.match_type)
 
-        # danger! In UDA, train = val = test
         self._val_dataset = ZippedDataSet(self.dm1._val_dataset, self.dm2._train_dataset, match_type=self.match_type)
         self._test_dataset = ZippedDataSet(self.dm1._test_dataset, self.dm2._train_dataset, match_type=self.match_type)
 

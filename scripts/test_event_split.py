@@ -107,9 +107,6 @@ def test_event(cfg: TestConfig, experiment: experiment_t, offline=False) -> None
             f"pdm run python3 scripts/train_test_msl.py --skip-initial -n 1 -d {'..' / cfg.hydra_config_dir.relative_to(PROJECT_DIR)} -c {cfg.ckpt_path} -e {cfg.test_event.value}"
             + (" --offline" if offline else "")
         )
-    elif experiment == "finetune":
-        # cmd = ""
-        raise NotImplementedError(experiment)
     else:
         raise ValueError(f"{experiment} is not a valid experiment")
     pprint(f"Running cmd: {cmd}")
