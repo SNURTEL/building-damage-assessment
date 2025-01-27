@@ -56,8 +56,8 @@ def main() -> pl.Trainer:
     args = parser.parse_args()
 
     assert (
-        bool(args.events) + bool(args.floodnet) + bool(args.rescuenet) == 1
-    ), "Provide exactly one of (--events, --floodnet, --rescuenet)"
+        bool(args.events) + bool(args.floodnet) == 1
+    ), "Provide exactly one of (--events, --floodnet)"
 
     with initialize(version_base="1.3", config_path=args.hydra_config):
         print(PROJECT_DIR)
