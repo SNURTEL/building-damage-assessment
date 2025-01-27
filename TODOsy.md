@@ -1,7 +1,6 @@
 - [x] porządek z nazwami skryptów
 - [x] nazwy klas
 - [ ] docstringi
-- [ ] test.py na dowolnych modelach
-- [ ] notebooki (zostawić infer + legend + results)
+- [x] notebooki (zostawić infer + legend + results)
 - [ ] readme
-- [ ] configi
+- [x] configi
