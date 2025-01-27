@@ -11,10 +11,15 @@ import torch
 from hydra import compose, initialize
 from pytorch_lightning.callbacks import RichProgressBar
 
+from _ensure_cwd import ensure_cwd
+
+PROJECT_DIR = ensure_cwd()
+
 from inz.data.event import Event, Hold, Test, Tier1, Tier3
 
 sys.path.append("inz/external/farseg")
 sys.path.append("inz/external/dahitra")
+sys.path.append("inz/external/dahitra/xBD_code")
 sys.path.append("inz/external/xview2_strong_baseline")
 
 
@@ -46,6 +51,7 @@ def main() -> pl.Trainer:
     args = parser.parse_args()
 
     with initialize(version_base="1.3", config_path=args.hydra_config):
+        print(PROJECT_DIR)
         cfg = compose(config_name="config", overrides=[])
 
     model_class_str = cfg["module"]["module"]["_target_"]

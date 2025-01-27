@@ -11,7 +11,7 @@ from typing import Literal
 
 import dotenv
 import hydra
-import c as pl
+import pytorch_lightning as pl
 import torch
 import torchvision.transforms as T
 from hydra import compose, initialize

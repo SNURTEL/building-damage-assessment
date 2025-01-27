@@ -1,6 +1,5 @@
 import datetime
 import importlib
-import json
 import os
 import sys
 from pathlib import Path
@@ -12,19 +11,23 @@ import torch
 from omegaconf import DictConfig, OmegaConf
 from pytorch_lightning.callbacks import ModelCheckpoint
 
-sys.path.append("inz/external/farseg")
-sys.path.append("inz/external/dahitra")
-sys.path.append("inz/external/xview2_strong_baseline")
+from _ensure_cwd import ensure_cwd
 
 
-from inz.util import get_loc_cls_weights, get_wandb_logger, nested_dict_to_tuples
+PROJECT_DIR = ensure_cwd()
+
+sys.path.append(PROJECT_DIR / "inz/external/farseg")
+sys.path.append(PROJECT_DIR / "inz/external/dahitra")
+sys.path.append(PROJECT_DIR / "inz/external/xview2_strong_baseline")
+
+from inz.util import get_wandb_logger
 
 
 def get_cwd() -> Path:
     return Path(__file__).parent.resolve()
 
 
-@hydra.main(config_path="config", config_name="common", version_base="1.3")
+@hydra.main(config_path=str(PROJECT_DIR / "config"), config_name="common", version_base="1.3")
 def main(cfg: DictConfig) -> pl.Trainer:
     OmegaConf.register_new_resolver("cwd", get_cwd)
     config = OmegaConf.to_container(cfg, resolve=True, enum_to_str=False)

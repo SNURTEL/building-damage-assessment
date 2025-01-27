@@ -182,7 +182,6 @@ if __name__ == "__main__":
         pass
 
 
-
     def wrapper(img_path: Path, out_size: int, todos: Collection[todos_t], out_path: Path) -> Path:
         process_single_image(img_path, out_size, todos, out_path)
         return img_path

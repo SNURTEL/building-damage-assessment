@@ -1,6 +1,10 @@
+"""
+This is a convenience script I created for batch evaluating models in the "split" experiment
+There is no guarantee this will work on your setup
+"""
+
 import argparse
 import itertools
-import os
 import re
 import shlex
 import subprocess
@@ -13,11 +17,9 @@ from rich.console import Console
 from rich.pretty import pprint
 from rich.text import Text
 
-if Path.cwd().stem == "scripts":
-    PROJECT_DIR = Path.cwd().parent
-    os.chdir("..")
-else:
-    PROJECT_DIR = Path.cwd()
+from scripts._ensure_cwd import ensure_cwd
+
+PROJECT_DIR = ensure_cwd()
 
 sys.path.append(str(PROJECT_DIR))
 
@@ -119,7 +121,9 @@ def test_event(cfg: TestConfig, experiment: experiment_t, offline=False) -> None
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--experiment", choices=["noadapt", "msl", "finetune"], nargs=1, help="Experiment to run", required=True)
+    parser.add_argument(
+        "--experiment", choices=["noadapt", "msl", "finetune"], nargs=1, help="Experiment to run", required=True
+    )
     parser.add_argument("--offline", action=argparse.BooleanOptionalAction, help="Do not log to wandb", default=False)
     parser.add_argument("-s", "--skip-n-first", type=int, help="Skip first N configs (useful for resuming)", default=0)
     args = parser.parse_args()
@@ -132,10 +136,14 @@ if __name__ == "__main__":
 
     experiment = args.experiment[0]
     console = Console()
-    text = Text.assemble((f"Running experiment {experiment.upper()}", "bold magenta"),)
+    text = Text.assemble(
+        (f"Running experiment {experiment.upper()}", "bold magenta"),
+    )
     console.print(text)
 
-    print(f"Running {max(n_configs - args.skip_n_first, 0)} test configs ({n_configs} total, {args.skip_n_first} skipped)")
+    print(
+        f"Running {max(n_configs - args.skip_n_first, 0)} test configs ({n_configs} total, {args.skip_n_first} skipped)"
+    )
     for i, cfg in enumerate(test_configs, start=1):
         if i <= args.skip_n_first:
             continue
