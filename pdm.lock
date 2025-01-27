@@ -5,7 +5,7 @@
 groups = ["default", "dev"]
 strategy = ["cross_platform", "inherit_metadata"]
 lock_version = "4.4.1"
-content_hash = "sha256:1ef88d49123211c6238087f57c27436d5c0cc417b799d9820d5e3ba600f01e7d"
+content_hash = "sha256:b8c4964f6b21ec1ad51c1cbc92d76797595988c2d1aa25ede1a698da88033115"
 
 [[package]]
 name = "absl-py"
@@ -577,17 +577,17 @@ files = [
 
 [[package]]
 name = "debugpy"
-version = "1.8.1"
+version = "1.8.11"
 requires_python = ">=3.8"
 summary = "An implementation of the Debug Adapter Protocol for Python"
 groups = ["default"]
 files = [
-    {file = "debugpy-1.8.1-cp311-cp311-macosx_11_0_universal2.whl", hash = "sha256:016a9fcfc2c6b57f939673c874310d8581d51a0fe0858e7fac4e240c5eb743cb"},
-    {file = "debugpy-1.8.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:fd97ed11a4c7f6d042d320ce03d83b20c3fb40da892f994bc041bbc415d7a099"},
-    {file = "debugpy-1.8.1-cp311-cp311-win32.whl", hash = "sha256:0de56aba8249c28a300bdb0672a9b94785074eb82eb672db66c8144fff673146"},
-    {file = "debugpy-1.8.1-cp311-cp311-win_amd64.whl", hash = "sha256:1a9fe0829c2b854757b4fd0a338d93bc17249a3bf69ecf765c61d4c522bb92a8"},
-    {file = "debugpy-1.8.1-py2.py3-none-any.whl", hash = "sha256:28acbe2241222b87e255260c76741e1fbf04fdc3b6d094fcf57b6c6f75ce1242"},
-    {file = "debugpy-1.8.1.zip", hash = "sha256:f696d6be15be87aef621917585f9bb94b1dc9e8aced570db1b8a6fc14e8f9b42"},
+    {file = "debugpy-1.8.11-cp311-cp311-macosx_14_0_universal2.whl", hash = "sha256:85de8474ad53ad546ff1c7c7c89230db215b9b8a02754d41cb5a76f70d0be296"},
+    {file = "debugpy-1.8.11-cp311-cp311-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:8ffc382e4afa4aee367bf413f55ed17bd91b191dcaf979890af239dda435f2a1"},
+    {file = "debugpy-1.8.11-cp311-cp311-win32.whl", hash = "sha256:40499a9979c55f72f4eb2fc38695419546b62594f8af194b879d2a18439c97a9"},
+    {file = "debugpy-1.8.11-cp311-cp311-win_amd64.whl", hash = "sha256:987bce16e86efa86f747d5151c54e91b3c1e36acc03ce1ddb50f9d09d16ded0e"},
+    {file = "debugpy-1.8.11-py2.py3-none-any.whl", hash = "sha256:0e22f846f4211383e6a416d04b4c13ed174d24cc5d43f5fd52e7821d0ebc8920"},
+    {file = "debugpy-1.8.11.tar.gz", hash = "sha256:6ad2688b69235c43b020e04fecccdf6a96c8943ca9c2fb340b8adc103c655e57"},
 ]
 
 [[package]]

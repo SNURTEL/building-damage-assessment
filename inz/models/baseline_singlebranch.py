@@ -1,16 +1,14 @@
-import os
 import sys
-from pathlib import Path
 
 import torch
 
 from inz.models.baseline_module import BaselineModule
 
-cwd = Path().resolve()
 sys.path.append("inz/external/xview2_strong_baseline")
-os.chdir(cwd / "inz/external/xview2_strong_baseline/legacy")
 
-from inz.legacy.zoo.models import Res34_Unet_Double  # type: ignore # noqa: E402
+from legacy.zoo.models import Res34_Unet_Double  # type: ignore # noqa: E402
+
+del sys.path[sys.path.index("inz/external/xview2_strong_baseline")]
 
 
 class BaselineSingleBranchModule(Res34_Unet_Double):

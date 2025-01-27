@@ -5,7 +5,7 @@ module:
     _target_: inz.models.baseline_singlebranch.BaselineSingleBranchModule
     pretrained: True
   loss:
-    _target_: inz.xview2_strong_baseline.legacy.losses.ComboLoss
+    _target_: inz.external.xview2_strong_baseline.legacy.losses.ComboLoss
     weights:
       dice: 1
       focal: 1
@@ -18,7 +18,7 @@ module:
     _target_: torch.optim.lr_scheduler.MultiStepLR
     _partial_: True
     gamma: 0.5
-    milestones : 
+    milestones :
       - 5
       - 11
       - 17
@@ -27,7 +27,7 @@ module:
       - 33
       - 47
       - 50
-      - 60 
+      - 60
       - 70
       - 90
       - 110
@@ -39,5 +39,5 @@ module:
 
 class_weights:
   _target_: torch.Tensor
-  _args_: 
+  _args_:
     - [0.1, 1., 9.0478803, 8.68207691, 12.9632271]

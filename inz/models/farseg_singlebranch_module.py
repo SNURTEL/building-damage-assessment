@@ -10,12 +10,12 @@ from torch import Tensor
 
 from inz.models.base_pl_module import BasePLModule
 
-sys.path.append("inz/farseg")
-sys.path.append("inz/farseg/module")
-sys.path.append("inz/farseg/loss")
+sys.path.append("inz/external/farseg")
 
 from module.farseg import FarSeg
-from loss import cosine_annealing, linear_annealing, poly_annealing
+from module.loss import cosine_annealing, linear_annealing, poly_annealing
+
+del sys.path[sys.path.index("inz/external/farseg")]
 
 
 class SingleBranchFarSegModule(BasePLModule):

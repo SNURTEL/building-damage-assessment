@@ -11,12 +11,16 @@ from inz.models.base_pl_module import BasePLModule
 
 cwd = Path().resolve()
 sys.path.append("inz/external/dahitra")
+
+# print(cwd)
 os.chdir(cwd / "inz/external/dahitra/xBD_code")
 
-from xBD_code.zoo.model_transformer_encoding import BASE_Transformer_UNet  # type: ignore # noqa: E402, I001
-from xBD_code.losses import ComboLoss  # type: ignore # noqa: E402, F401
+from zoo.model_transformer_encoding import BASE_Transformer_UNet  # type: ignore # noqa: E402, I001
+from losses import ComboLoss  # type: ignore # noqa: E402, F401
 
 os.chdir(cwd)
+
+del sys.path[sys.path.index("inz/external/dahitra")]
 
 
 class DahitraModule(nn.Module):
