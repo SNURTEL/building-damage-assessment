@@ -18,7 +18,7 @@ from module.loss import cosine_annealing, linear_annealing, poly_annealing
 
 del sys.path[sys.path.index("inz/external/farseg")]
 
-class DoubleBranchFarSegModule(BasePLModule):
+class FarSegModule(BasePLModule):
     def __init__(
         self,
         model: nn.Module,
@@ -26,7 +26,7 @@ class DoubleBranchFarSegModule(BasePLModule):
         scheduler_factory: Callable[[Any], torch.optim.lr_scheduler.LRScheduler] | None = None,
         class_weights: Tensor | None = None,
     ):
-        super(DoubleBranchFarSegModule, self).__init__(
+        super(FarSegModule, self).__init__(
             model=model,
             optimizer_factory=optimizer_factory,
             scheduler_factory=scheduler_factory,

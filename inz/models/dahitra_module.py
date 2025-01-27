@@ -12,7 +12,6 @@ from inz.models.base_pl_module import BasePLModule
 cwd = Path().resolve()
 sys.path.append("inz/external/dahitra")
 
-# print(cwd)
 os.chdir(cwd / "inz/external/dahitra/xBD_code")
 
 from zoo.model_transformer_encoding import BASE_Transformer_UNet  # type: ignore # noqa: E402, I001

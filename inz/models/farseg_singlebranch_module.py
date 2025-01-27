@@ -18,7 +18,7 @@ from module.loss import cosine_annealing, linear_annealing, poly_annealing
 del sys.path[sys.path.index("inz/external/farseg")]
 
 
-class SingleBranchFarSegModule(BasePLModule):
+class FarSegSingleBranchModule(BasePLModule):
     def __init__(
         self,
         model: nn.Module,
@@ -27,7 +27,7 @@ class SingleBranchFarSegModule(BasePLModule):
         n_classes: int = 5,
         class_weights: Tensor | None = None,
     ):
-        super(SingleBranchFarSegModule, self).__init__(
+        super(FarSegSingleBranchModule, self).__init__(
             model=model,
             optimizer_factory=optimizer_factory,
             scheduler_factory=scheduler_factory,

@@ -4,7 +4,7 @@ class_weights:
     - [0.01, 1, 9.04788032 ,8.68207691, 12.9632271]
 
 module:
-  _target_: inz.models.farseg_module.DoubleBranchFarSegModule
+  _target_: inz.models.farseg_module.FarSegModule
   _partial_: True
   optimizer_factory:
     _target_: torch.optim.AdamW
@@ -19,7 +19,7 @@ module:
   model:
     _target_: inz.models.farseg_module.DoubleBranchFarSeg
     n_classes: 5
-    farseg_config: 
+    farseg_config:
       resnet_encoder:
         resnet_type: "resnet50"
         include_conv5: True
@@ -33,7 +33,7 @@ module:
       fpn:
         in_channels_list: [512, 1024, 2048, 4096]
         out_channels: 256
-        conv_block: 
+        conv_block:
           _target_: simplecv.module.fpn.default_conv_block
           _partial_: True
         top_blocks: None

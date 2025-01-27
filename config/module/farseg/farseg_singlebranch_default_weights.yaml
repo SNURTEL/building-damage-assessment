@@ -5,7 +5,7 @@ class_weights:
 
 # todo test with 2x batch size
 module:
-  _target_: inz.models.farseg_singlebranch_module.SingleBranchFarSegModule
+  _target_: inz.models.farseg_singlebranch_module.FarSegSingleBranchModule
   _partial_: True
   optimizer_factory:
     _target_: torch.optim.AdamW
@@ -20,7 +20,7 @@ module:
   model:
     _target_: inz.models.farseg_singlebranch_module.SingleBranchFarSeg
     n_classes: 5
-    farseg_config: 
+    farseg_config:
       resnet_encoder:
         resnet_type: "resnet50"
         include_conv5: True
@@ -34,7 +34,7 @@ module:
       fpn:
         in_channels_list: [256, 512, 1024, 2048]
         out_channels: 256
-        conv_block: 
+        conv_block:
           _target_: simplecv.module.fpn.default_conv_block
           _partial_: True
         top_blocks: None
