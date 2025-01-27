@@ -1,5 +1,6 @@
 import argparse
 import importlib
+from pathlib import Path
 import sys
 from argparse import ArgumentParser
 from pprint import pprint
@@ -15,6 +16,7 @@ from _ensure_cwd import ensure_cwd
 
 PROJECT_DIR = ensure_cwd()
 
+from inz.data.data_module_frnet import FRNetModule
 from inz.data.event import Event, Hold, Test, Tier1, Tier3
 
 sys.path.append("inz/external/farseg")
@@ -44,11 +46,18 @@ def main() -> pl.Trainer:
         required=True,
     )
     parser.add_argument(
+        "-f", "--floodnet", action=argparse.BooleanOptionalAction, help="Use the floodnet dataset", default=False
+    )
+    parser.add_argument(
         "-r", "--run-name", help="Run name; defaults to t_{original_run_name}", required=False, default=None
     )
     parser.add_argument("--offline", action=argparse.BooleanOptionalAction, help="Do not log to wandb", default=False)
 
     args = parser.parse_args()
+
+    assert (
+        bool(args.events) + bool(args.floodnet) + bool(args.rescuenet) == 1
+    ), "Provide exactly one of (--events, --floodnet, --rescuenet)"
 
     with initialize(version_base="1.3", config_path=args.hydra_config):
         print(PROJECT_DIR)
@@ -94,16 +103,24 @@ def main() -> pl.Trainer:
                     events[split].append(event)
 
     pprint(events)
-    dm = XBDDataModule(
-        path=cfg["datamodule"]["datamodule"]["path"],
-        drop_unclassified_channel=True,
-        events=events,
-        val_fraction=0.0,
-        test_fraction=1.0,
-        train_batch_size=BATCH_SIZE,
-        val_batch_size=BATCH_SIZE,
-        test_batch_size=BATCH_SIZE,
-    )
+    if args.floodnet:
+        FRNetModule(
+            path=Path(PROJECT_DIR / "data/floodnet_processed_512/FloodNet-Supervised_v1.0"),
+            train_batch_size=BATCH_SIZE,
+            val_batch_size=BATCH_SIZE,
+            test_batch_size=BATCH_SIZE,
+        )
+    else:
+        dm = XBDDataModule(
+            path=PROJECT_DIR / "data/xBD_processed_512",
+            drop_unclassified_channel=True,
+            events=events,
+            val_fraction=0.0,
+            test_fraction=1.0,
+            train_batch_size=BATCH_SIZE,
+            val_batch_size=BATCH_SIZE,
+            test_batch_size=BATCH_SIZE,
+        )
     dm.prepare_data()
     dm.setup("test")
 

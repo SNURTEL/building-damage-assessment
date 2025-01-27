@@ -128,11 +128,9 @@ if __name__ == "__main__":
 
         if DATASET == "floodnet":
             if mask[1:3].sum() == 0 and random.random() > 0.1:
-                print(f"SKIP {img_path.stem}")
                 return
 
             if int(img_path.stem) in FLOODNET_ROTATED_MASKS:
-                print(f"ROTATE {mask_path.stem}")
                 # fix rotated masks
                 mask = T.rotate(mask, angle=180)
 
@@ -188,10 +186,10 @@ if __name__ == "__main__":
 
     all_todos = {"images", "masks", "preview"}
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dataset", choices=("flodnet", "rescuenet"), nargs=1, help="Dataset to process", required=True)
-    parser.add_argument("--out-size", type=int, help="Target image size")
-    parser.add_argument("--out-path", type=Path, help="Output directory")
-    parser.add_argument("--todos", nargs="+", choices=all_todos | {"all"})
+    parser.add_argument("dataset", choices=("floodnet", "rescuenet"), nargs=1, help="Dataset to process")
+    parser.add_argument("out_size", type=int, help="Target image size")
+    parser.add_argument("out_path", type=Path, help="Output directory")
+    parser.add_argument("todos", nargs="+", choices=all_todos | {"all"})
     parser.add_argument("--dry-run", action=argparse.BooleanOptionalAction, help="Do not perform any writes")
     parser.add_argument("--workers", type=int, default=None, help="How many worker processes to use (defaults to number of cpus)")
     args = parser.parse_args()

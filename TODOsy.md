@@ -2,5 +2,5 @@
 - [x] nazwy klas
 - [ ] docstringi
 - [x] notebooki (zostawić infer + legend + results)
-- [ ] readme
+- [x] readme
 - [x] configi

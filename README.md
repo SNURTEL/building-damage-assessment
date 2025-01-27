@@ -1,62 +1,77 @@
-# inz
+# Analysis of Aerial and Satellite Imagery for Emergency Scenarios
 
 ### Setup
 
-##### 1. Install the project
+Initialize submodules
+
+```shell
+git submodule update --init --remote
+```
+
+Install the project using [PDM](https://pdm-project.org/en/latest/)
 
 ```shell
 pdm install
 ```
 
-##### 2. Copy the envfile and input your `wandb` API key
+Copy the envfile and input your `wandb` API key
 
 ```shell
 cp .env.sample .env
 ```
 
-##### 3. Get the [xBD dataset](https://xview2.org/dataset) and unpack (or symlink) it to `data/xBD`.
+#### Datesets
 
-##### 4. Run the data preprocessing script
+- [xBD dataset](https://xview2.org/dataset) (51 GB download, 133 GB uncompressed, +69 GB pre-processed)
 
-```shell
-pdm run scripts/make_data.py
-```
+    - An account in the *xView2* challenge is also required
 
-This will output the preprocessed data to `data/xBD_processed`
+- [FloodNet dataset](https://www.dropbox.com/scl/fo/k33qdif15ns2qv2jdxvhx/ANGaa8iPRhvlrvcKXjnmNRc?rlkey=ao2493wzl1cltonowjdbrnp7f&e=4&dl=0) (12 GB download, 13 GB uncompressed, +1 GB pre-processed)
 
+Unpack the datasets and move / symlink them to `data/xBD` and `data/floodnet` respectively
 
-### Run sanity-check training:
-
-```shell
-pdm run main.py
-```
-
-This will use the hydra config from `config/common.yaml`.
-
-Metrics will be logged to `wandb` (`inz` project).
-
-Outputs will be written to `outputs/<EXPERIMENT_NAME>/<RUN_START_DATETIME>`, which will also be symlinked to `outputs/<EXPERIMENT_NAME>/latest_run`. Checkpoints can be found in the `checkpoints` subdirectory. NOTE - the symlinked dir updates with every run!
-
-### Start an experiment
-
-Simply replace the datamodule (or whatever component needs to be replaced):
+Then, run preprocessing scripts, which will prepare the data for training:
 
 ```shell
-pdm run main.py datamodule=<DATAMODULE_OVERRIDE>
+pdm run scripts/make_data_xbd.py 512 data/xBD_processed_512 all
+pdm run scripts/make_data_floodnet_rescuenet.py floodnet 512 data/rescuenet_processed_512 all
 ```
 
-e.g.
+### Train
 
 ```shell
-pdm run main.py datamodule=val_on_hurricanes 
+pdm run scripts/train.py \
+    datamodule=<DATAMODULE> \
+    module=<MODEL>
 ```
 
-### Resume a previous run
+Default datamodule setup assumes a 24 GB VRAM GPU, override batch sizes if needed. Training using `tier1` and `tier3` xBD subsets converges after approximately 40 epochs and takes ~20h to train on an RTX 3090.
 
-This will be tricky. Theoretically, if you specified `resume_from_checkpoint: last|if_exist`, the last run should resume automatically. If that does not happen for whatever reason, we'll have to override hydra's config with the one dumped when the previous run was created:
+### Adapt
 
 ```shell
-pdm run main.py --config-path <PREVIOUS_RUN_PATH>/.hydra --config-name config hydra.run.dir=<PREVIOUS_RUN_PATH> resume_from_checkpoint="<PREVIOUS_RUN_PATH>/checkpoints/<CHECKPOINT"
+pdm run scripts/adapt.py \
+    [--events <EVENT1>,<EVENT2>,<EVENT_N>|--floodnet] \
+    -d <DUMPED_HYDRA_CONFIG> \
+    -c <MODEL_CHECKPOINT>
 ```
 
-The run should be resumed from the checkpoint. The symlinked directory will NOT be updated.
+Find the hydra config directory (`.hydra`) and model checkpoint in output directory created during training (`outputs/experiment_name`). The dumped config will include everything you set during the training stage, including CLI overrides.
+
+### Finetune
+
+```shell
+pdm run scripts/finetune.py \
+    [--events <EVENT1>,<EVENT2>,<EVENT_N>|--floodnet] \
+    -d <DUMPED_HYDRA_CONFIG> \
+    -c <MODEL_CHECKPOINT>
+```
+
+### Evaluate
+
+```shell
+pdm run scripts/eval.py \
+    [--events <EVENT1>,<EVENT2>,<EVENT_N>|--floodnet] \
+    -d <DUMPED_HYDRA_CONFIG> \
+    -c <MODEL_CHECKPOINT>
+```
