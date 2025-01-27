@@ -1,0 +1,4 @@
+# exclude notebooks from repo stats
+notebooks/* linguist-generated
+notebooks/misc/* linguist-generated
+notebooks/results_analysis/* linguist-generated
