@@ -7,14 +7,17 @@ datamodule:
       - midwest_flooding
       - hurricane_michael
       - hurricane_harvey
+      - hurricane_florence
     Hold:
       - midwest_flooding
       - hurricane_michael
       - hurricane_harvey
+      - hurricane_florence
     Test:
       - midwest_flooding
       - hurricane_michael
       - hurricane_harvey
+      - hurricane_florence
   val_fraction: 0.15
   test_fraction: 0.0
   train_batch_size: 36
@@ -29,13 +32,12 @@ datamodule:
       p: 0.6
       transforms:
         - _target_: torchvision.transforms.RandomAffine
-          degrees: 
+          degrees:
             - -10
-            - 10 
-          scale: 
+            - 10
+          scale:
             - 0.9
             - 1.1
-          translate: 
+          translate:
             - 0.1
             - 0.1
-

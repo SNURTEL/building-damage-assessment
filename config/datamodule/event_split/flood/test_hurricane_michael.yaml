@@ -6,12 +6,15 @@ datamodule:
     Tier1:
       - midwest_flooding
       - hurricane_harvey
+      - hurricane_florence
     Hold:
       - midwest_flooding
       - hurricane_harvey
+      - hurricane_florence
     Test:
       - midwest_flooding
       - hurricane_harvey
+      - hurricane_florence
     Tier3:
       - nepal_flooding
   val_fraction: 0.15
@@ -28,13 +31,12 @@ datamodule:
       p: 0.6
       transforms:
         - _target_: torchvision.transforms.RandomAffine
-          degrees: 
+          degrees:
             - -10
-            - 10 
-          scale: 
+            - 10
+          scale:
             - 0.9
             - 1.1
-          translate: 
+          translate:
             - 0.1
             - 0.1
-

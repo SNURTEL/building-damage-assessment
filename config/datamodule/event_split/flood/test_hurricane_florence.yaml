@@ -4,17 +4,17 @@ datamodule:
   drop_unclassified_channel: True
   events:
     Tier1:
+      - midwest_flooding
       - hurricane_michael
       - hurricane_harvey
-      - hurricane_florence
     Hold:
+      - midwest_flooding
       - hurricane_michael
       - hurricane_harvey
-      - hurricane_florence
     Test:
+      - midwest_flooding
       - hurricane_michael
       - hurricane_harvey
-      - hurricane_florence
     Tier3:
       - nepal_flooding
   val_fraction: 0.15
