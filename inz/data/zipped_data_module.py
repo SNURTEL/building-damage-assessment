@@ -7,6 +7,15 @@ from torch.utils.data import DataLoader, Dataset
 
 
 class BDADataModule(Protocol):
+    """
+    A data module for handling train, validation, and test datasets.
+
+    Attributes:
+        _train_dataset: The training dataset.
+        _val_dataset : The validation dataset.
+        _test_dataset: The test dataset.
+    """
+
     _train_dataset: torch.utils.data.Dataset
     _val_dataset: torch.utils.data.Dataset
     _test_dataset: torch.utils.data.Dataset
@@ -17,10 +26,15 @@ class BDADataModule(Protocol):
 
 
 class ZippedDataSet(torch.utils.data.Dataset):
-    def __init__(self,
-                 dataset1: Dataset,
-                 dataset2: Dataset,
-        match_type: Literal["min", "max"]) -> None:
+    def __init__(self, dataset1: Dataset, dataset2: Dataset, match_type: Literal["min", "max"]) -> None:
+        """
+        Initialize the ZippedDataModule object.
+
+        Args:
+            dataset1 (Dataset): The first dataset.
+            dataset2 (Dataset): The second dataset.
+            match_type (Literal["min", "max"]): The type of matching to perform. Can be either "min" or "max".
+        """
         self.dataset1 = dataset1
         self.dataset2 = dataset2
         self.match_type = match_type
@@ -50,6 +64,18 @@ class ZippedDataModule(pl.LightningDataModule):
         val_batch_size: int | None = None,
         test_batch_size: int | None = None,
     ) -> None:
+        """
+        Initialize a ZippedDataModule object.
+
+        Args:
+            dm1 (BDADataModule): The first BDADataModule object.
+            dm2 (BDADataModule): The second BDADataModule object.
+            match_type (Literal["min", "max"]): The type of matching to perform.
+            num_workers (int): The number of workers for data loading.
+            train_batch_size (int | None, optional): The batch size for training data. Defaults to None.
+            val_batch_size (int | None, optional): The batch size for validation data. Defaults to None.
+            test_batch_size (int | None, optional): The batch size for testing data. Defaults to None.
+        """
         super(ZippedDataModule, self).__init__()
         self.dm1 = dm1
         self.dm2 = dm2
@@ -69,11 +95,9 @@ class ZippedDataModule(pl.LightningDataModule):
         self.dm1.prepare_data()
         self.dm2.prepare_data()
 
-        # todo will not work with TensorDataset
-        self._train_dataset = ZippedDataSet(self.dm1._train_dataset, self.dm2._train_dataset, match_type=self.match_type)
-        # self._val_dataset = ZippedDataSet(self.dm1._val_dataset, self.dm2._val_dataset, match_type=self.match_type)
-        # self._test_dataset = ZippedDataSet(self.dm1._test_dataset, self.dm2._test_dataset, match_type=self.match_type)
-
+        self._train_dataset = ZippedDataSet(
+            self.dm1._train_dataset, self.dm2._train_dataset, match_type=self.match_type
+        )
         self._val_dataset = ZippedDataSet(self.dm1._val_dataset, self.dm2._train_dataset, match_type=self.match_type)
         self._test_dataset = ZippedDataSet(self.dm1._test_dataset, self.dm2._train_dataset, match_type=self.match_type)
 

@@ -27,6 +27,16 @@ class FarSegSingleBranchModule(BasePLModule):
         n_classes: int = 5,
         class_weights: Tensor | None = None,
     ):
+        """
+        Initializes the FarSegSingleBranchModule.
+
+        Args:
+            model (nn.Module): The neural network model.
+            optimizer_factory (Callable[[Any], torch.optim.Optimizer]): A factory function that creates an optimizer.
+            scheduler_factory (Callable[[Any], torch.optim.lr_scheduler.LRScheduler] | None, optional): A factory function that creates a learning rate scheduler. Defaults to None.
+            n_classes (int, optional): The number of classes. Defaults to 5.
+            class_weights (Tensor | None, optional): The class weights. Defaults to None.
+        """
         super(FarSegSingleBranchModule, self).__init__(
             model=model,
             optimizer_factory=optimizer_factory,
@@ -54,6 +64,14 @@ class FarSegSingleBranchModule(BasePLModule):
 
 class SingleBranchFarSeg(nn.Module):
     def __init__(self, farseg_config: dict, n_classes: int, class_weights: Tensor | None = None):
+        """
+        Initialize the SingleBranchFarSeg module.
+
+        Args:
+            farseg_config (dict): Configuration dictionary for the FarSeg model.
+            n_classes (int): Number of classes.
+            class_weights (Tensor | None, optional): Class weights tensor. Defaults to None.
+        """
         super(SingleBranchFarSeg, self).__init__()
         self.farseg_config = farseg_config
         self.n_classes = n_classes
@@ -142,6 +160,15 @@ class SingleBranchFarSeg(nn.Module):
         self.module.cls_loss = _cls_loss
 
     def forward(self, x) -> torch.Tensor:
+        """
+        Forward pass of the model.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Output tensor.
+        """
         feat_list = self.module.en(x)
         fpn_feat_list = self.module.fpn(feat_list)
         if "scene_relation" in self.module.config:

@@ -1,6 +1,0 @@
-- [x] porządek z nazwami skryptów
-- [x] nazwy klas
-- [ ] docstringi
-- [x] notebooki (zostawić infer + legend + results)
-- [x] readme
-- [x] configi

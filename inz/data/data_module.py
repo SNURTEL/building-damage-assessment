@@ -1,8 +1,7 @@
 import itertools
-import os
 from collections import Counter
 from pathlib import Path
-from typing import Any, Literal, Sequence, Callable
+from typing import Any, Callable, Literal, Sequence
 
 import numpy as np
 import pytorch_lightning as pl
@@ -11,13 +10,9 @@ from pytorch_lightning.utilities.types import TRAIN_DATALOADERS
 from torch.utils.data import DataLoader, Dataset, random_split
 from torchvision import transforms  # type: ignore[import-untyped]
 from torchvision.io import read_image  # type: ignore[import-untyped]
-import torchvision.transforms as T
 
 import inz.data.event
 from inz.data.event import Event, Hold, Subset, Test, Tier1, Tier3
-
-import gc
-
 
 # Keep this number low! More workers will marginally improve performance
 # at a cost of huge ram (and swap!!!) usage.

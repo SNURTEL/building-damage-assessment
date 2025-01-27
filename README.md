@@ -24,7 +24,7 @@ cp .env.sample .env
 
 - [xBD dataset](https://xview2.org/dataset) (51 GB download, 133 GB uncompressed, +69 GB pre-processed)
 
-    - An account in the *xView2* challenge is also required
+    - An account in the *xView2* challenge is required
 
 - [FloodNet dataset](https://www.dropbox.com/scl/fo/k33qdif15ns2qv2jdxvhx/ANGaa8iPRhvlrvcKXjnmNRc?rlkey=ao2493wzl1cltonowjdbrnp7f&e=4&dl=0) (12 GB download, 13 GB uncompressed, +1 GB pre-processed)
 
@@ -45,7 +45,7 @@ pdm run scripts/train.py \
     module=<MODEL>
 ```
 
-Default datamodule setup assumes a 24 GB VRAM GPU, override batch sizes if needed. Training using `tier1` and `tier3` xBD subsets converges after approximately 40 epochs and takes ~20h to train on an RTX 3090.
+Default datamodule setup assumes a 24 GB VRAM GPU, override batch sizes if needed. Training using `tier1` and `tier3` xBD subsets converges after approximately 40 epochs and takes ~20h to train on an RTX 3090 using `BF16-mixed` precision.
 
 ### Adapt
 

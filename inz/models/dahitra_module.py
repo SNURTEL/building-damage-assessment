@@ -24,6 +24,15 @@ del sys.path[sys.path.index("inz/external/dahitra")]
 
 class DahitraModule(nn.Module):
     def __init__(self, *args, image_size: int = 1024, **kwargs) -> None:
+        """
+        Initializes the DahitraModule.
+
+        Args:
+            *args: Variable length argument list.
+            image_size (int): The size of the input image. Defaults to 1024.
+            **kwargs: Arbitrary keyword arguments.
+
+        """
         super(DahitraModule, self).__init__()
         self.module = BASE_Transformer_UNet(*args, **kwargs)
 
@@ -42,6 +51,15 @@ class DahitraModule(nn.Module):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass of the Dahitra module.
+
+        Args:
+            x (torch.Tensor): The input tensor.
+
+        Returns:
+            torch.Tensor: The output tensor.
+        """
         return self.module(x)
 
 
@@ -54,6 +72,16 @@ class DahitraPLModule(BasePLModule):
         scheduler_factory: Callable[[Any], torch.optim.lr_scheduler.LRScheduler] | None = None,
         class_weights: Tensor | None = None,
     ):
+        """
+        Initializes the DahitraPLModule.
+
+        Args:
+            model (nn.Module): The neural network model.
+            loss (nn.Module): The loss function.
+            optimizer_factory (Callable[[Any], torch.optim.Optimizer]): A factory function that creates an optimizer.
+            scheduler_factory (Callable[[Any], torch.optim.lr_scheduler.LRScheduler] | None, optional): A factory function that creates a learning rate scheduler. Defaults to None.
+            class_weights (Tensor | None, optional): Class weights for the loss function. Defaults to None.
+        """
         super(DahitraPLModule, self).__init__(
             model=model,
             optimizer_factory=optimizer_factory,

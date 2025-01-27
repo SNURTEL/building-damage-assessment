@@ -18,6 +18,7 @@ from module.loss import cosine_annealing, linear_annealing, poly_annealing
 
 del sys.path[sys.path.index("inz/external/farseg")]
 
+
 class FarSegModule(BasePLModule):
     def __init__(
         self,
@@ -26,6 +27,15 @@ class FarSegModule(BasePLModule):
         scheduler_factory: Callable[[Any], torch.optim.lr_scheduler.LRScheduler] | None = None,
         class_weights: Tensor | None = None,
     ):
+        """
+        Initialize the FarSegModule.
+
+        Args:
+            model (nn.Module): The neural network model.
+            optimizer_factory (Callable[[Any], torch.optim.Optimizer]): A factory function that creates an optimizer.
+            scheduler_factory (Callable[[Any], torch.optim.lr_scheduler.LRScheduler] | None, optional): A factory function that creates a learning rate scheduler. Defaults to None.
+            class_weights (Tensor | None, optional): Class weights for the loss function. Defaults to None.
+        """
         super(FarSegModule, self).__init__(
             model=model,
             optimizer_factory=optimizer_factory,
@@ -51,6 +61,14 @@ class FarSegModule(BasePLModule):
 
 class DoubleBranchFarSeg(nn.Module):
     def __init__(self, farseg_config: dict, n_classes: int, class_weights: Tensor | None = None):
+        """
+        Initialize the DoubleBranchFarSeg model.
+
+        Args:
+            farseg_config (dict): Configuration dictionary for the FarSeg model.
+            n_classes (int): Number of classes.
+            class_weights (Tensor | None, optional): Class weights tensor. Defaults to None.
+        """
         super(DoubleBranchFarSeg, self).__init__()
         self.farseg_config = farseg_config
         self.n_classes = n_classes
@@ -140,6 +158,15 @@ class DoubleBranchFarSeg(nn.Module):
         self.module.cls_loss = _cls_loss
 
     def forward(self, x) -> torch.Tensor:
+        """
+        Forward pass of the FarsegModule.
+
+        Args:
+            x (torch.Tensor): Input tensor.
+
+        Returns:
+            torch.Tensor: Output tensor after passing through the FarsegModule.
+        """
         feat_list_1 = self.module.en(x[:, :3, ...])
         feat_list_2 = self.module.en(x[:, 3:, ...])
         feat_list = [torch.cat([t1, t2], dim=1) for t1, t2 in zip(feat_list_1, feat_list_2)]
