@@ -235,3 +235,4 @@ wandb
 outputs
 lightning_logs
 saved_checkpoints
+.pdm-python
