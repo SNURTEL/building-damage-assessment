@@ -1,5 +1,11 @@
 # Analysis of Aerial and Satellite Imagery for Emergency Scenarios
 
+![img](.img/banner.png)
+
+My BSc thesis.
+
+Leveraging machine learning methods to analyze images of areas affected by natural disasters can accelerate crisis response; however, creating a model robust enough to analyze arbitrary photographs is a non-trivial task. The existing literature primarily focuses on achieving high performance in simultaneous building detection and damage classification using the [xBD](https://arxiv.org/abs/1911.09296) dataset, but the models' capabilities to generalize to previously unseen events or different types of images have been sparsely studied. This study analyzes the performance of selected models considering problem framing (semantic segmentation versus change detection), evaluation on unseen events, and differences in spatial resolution between training and testing data. The potential of fine-tuning and unsupervised domain adaptation to improve results was also investigated. A training and evaluation pipeline was implemented to conduct experiments. The obtained results were analyzed in terms of aggregated metric values and common patterns in model predictions. Several factors influenced the outcomes, including building density in the images, geographic differences between photographed areas, and the nature of the damages caused by the events. In some cases, applying unsupervised domain adaptation or redefining the task proved beneficial for improving result quality.
+
 ### Setup
 
 Initialize submodules
