@@ -1,6 +1,6 @@
 # Analysis of Aerial and Satellite Imagery for Emergency Scenarios
 
-![img](.img/banner.png)
+![img](.img/banner.jpg)
 
 My BSc thesis.
 
